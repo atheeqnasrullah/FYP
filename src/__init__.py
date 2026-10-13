@@ -1,0 +1,1 @@
+"""Stroke rehabilitation research prototype."""

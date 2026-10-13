@@ -1,0 +1,17 @@
+numpy
+scipy
+pandas
+scikit-learn
+joblib
+pyserial
+opencv-contrib-python==4.11.0.86
+mediapipe
+pygame
+fastapi
+uvicorn[standard]
+streamlit
+plotly
+requests
+PyYAML
+matplotlib
+seaborn

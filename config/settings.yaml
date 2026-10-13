@@ -1,0 +1,19 @@
+serial_port: "COM3"
+baud_rate: 921600
+fs: 1000
+n_channels: 1
+signal_type: envelope       # MD0437 SIG output is filtered/rectified activity envelope
+window_ms: 200
+step_ms: 100
+bandpass: [20, 450]
+notch_hz: 50
+smoothing_n: 5
+min_confidence: 0.6
+vision_smoothing_frames: 5
+pointer_smoothing_alpha: 0.35
+lr_motion_threshold: 0.025
+ud_motion_threshold: 0.04
+lr_motion_hold_ms: 350
+lr_motion_cooldown_ms: 280
+camera_index: 0
+backend_url: "http://127.0.0.1:8000"
