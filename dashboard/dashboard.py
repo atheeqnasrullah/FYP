@@ -9,6 +9,9 @@ import requests
 import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from src.utils.session_sync import PENDING, sync_pending_sessions
 GAMES = {
     "Balloon Pop": "balloon",
     "Car Driving": "car",
@@ -18,6 +21,7 @@ GAMES = {
 INPUT_MODES = {
     "Webcam only (turn camera on)": "vision",
     "Webcam + EMG sensor": "live",
+    "Webcam + EMG replay (no sensor)": "live-replay",
     "Keyboard controls": "keyboard",
     "Simulator": "sim",
 }
@@ -25,9 +29,18 @@ INPUT_MODES = {
 st.set_page_config(page_title="Rehabilitation Dashboard", layout="wide")
 st.title("Stroke Rehabilitation Dashboard")
 api = st.sidebar.text_input("API URL", "http://127.0.0.1:8000").rstrip("/")
+if PENDING.exists():
+    st.sidebar.warning("Some sessions were saved offline while the API was unavailable.")
+    if st.sidebar.button("Upload offline sessions"):
+        uploaded, remaining = sync_pending_sessions(api)
+        st.sidebar.info(f"Uploaded {uploaded} session(s); {remaining} still pending.")
 
 try:
-    patient_rows = requests.get(f"{api}/patients", timeout=3).json()
+    response = requests.get(f"{api}/patients", timeout=3)
+    response.raise_for_status()
+    patient_rows = response.json()
+    if not isinstance(patient_rows, list):
+        raise ValueError("unexpected /patients response; is this the rehabilitation API?")
     patient_codes = [row["patient_id"] for row in patient_rows]
     api_error = None
 except (requests.RequestException, ValueError) as exc:
@@ -44,9 +57,9 @@ with st.container(border=True):
         game_slug = GAMES[game_name]
         input_options = list(INPUT_MODES)
         if game_slug == "car":
-            input_options = input_options[:2]
+            input_options = input_options[:3]
         input_label = st.selectbox("Input method", input_options, key=f"input_mode_{game_slug}", index=0)
-        if INPUT_MODES[input_label] in ("vision", "live"):
+        if INPUT_MODES[input_label] in ("vision", "live", "live-replay"):
             st.caption("The webcam identifies hand gestures and movement direction; its video appears behind the game objects.")
         else:
             st.caption("Camera stays off in this mode.")
@@ -54,6 +67,8 @@ with st.container(border=True):
             st.caption("Move your hand left/right to steer; close your hand to brake. Webcam + EMG also displays RMS/MAV activity features.")
         elif game_slug == "shape":
             st.caption("The webcam pointer and hand-close/open gestures control shape pickup and drop. Webcam + EMG also displays muscle-activity features; mouse/Space is available if the camera is off.")
+        if INPUT_MODES[input_label] == "live-replay":
+            st.caption("EMG features come from a recorded healthy-volunteer signal replayed at 1 kHz, for testing without the ESP32.")
         if INPUT_MODES[input_label] == "live":
             st.caption("The game window opens immediately and waits there until fresh EMG data arrives. Camera labels control actions; EMG RMS/MAV provides activity feedback.")
     with patient_col:
@@ -82,16 +97,19 @@ if start_clicked:
     elif process is not None:
         st.warning("A game is already running. Stop it before starting another.")
     else:
+        mode = INPUT_MODES[input_label]
         command = [
             sys.executable,
             "-u",
             str(ROOT / "main.py"),
-            INPUT_MODES[input_label],
+            "live" if mode == "live-replay" else mode,
             "--game",
             GAMES[game_name],
             "--patient",
             patient_id.strip(),
         ]
+        if mode == "live-replay":
+            command += ["--emg-source", "replay"]
         try:
             options = {
                 "cwd": str(ROOT),
@@ -111,7 +129,7 @@ if start_clicked:
                 st.session_state.game_process = subprocess.Popen(command, stdout=log_file, stderr=log_file, **options)
             process = st.session_state.game_process
             st.success(f"{game_name} started in {input_label} mode. Use the game window to play; close it with Esc.")
-            if INPUT_MODES[input_label] in ("vision", "live"):
+            if INPUT_MODES[input_label] in ("vision", "live", "live-replay"):
                 st.caption(f"If the camera does not open, check camera permissions and see `{log_path.relative_to(ROOT)}`.")
         except OSError as exc:
             st.error(f"Could not start the game. Check that pygame is installed in this environment. Details: {exc}")

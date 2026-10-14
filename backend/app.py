@@ -1,14 +1,14 @@
 from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
-import csv, io, sqlite3
+import csv, io, os, sqlite3
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from src.utils.config import ROOT
 
 app=FastAPI(title="Rehabilitation Session API",version="1.0")
-DB=ROOT/"data/rehab.db"
+DB=Path(os.environ.get("REHAB_DB",ROOT/"data/rehab.db"))
 
 @app.get("/")
 def home():

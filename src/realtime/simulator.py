@@ -1,7 +1,8 @@
 import random, threading, time
 from src.realtime.pipeline import command_bus
+from src.utils.config import runtime_labels
 
-COMMANDS=["Rest","Hand_Open","Hand_Close","Wrist_Flexion","Wrist_Extension","Supination","Pronation","Left","Right"]
+COMMANDS=runtime_labels()
 
 def start_simulator(interval=1.0):
     def run():

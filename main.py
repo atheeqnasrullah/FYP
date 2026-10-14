@@ -6,10 +6,12 @@ def main():
     parser=argparse.ArgumentParser(description="Gamified stroke rehabilitation research prototype")
     parser.add_argument("mode",nargs="?",choices=["keyboard","sim","vision","live"],default="keyboard")
     parser.add_argument("--game",choices=["balloon","car","treasure","shape"],default="balloon")
-    parser.add_argument("--patient",default="P01"); args=parser.parse_args()
+    parser.add_argument("--patient",default="P01")
+    parser.add_argument("--emg-source",choices=["serial","replay"],default="serial",help="live mode: ESP32 serial stream or a Datasets/ recording replayed at 1 kHz")
+    args=parser.parse_args()
     if args.mode=="sim":start_simulator()
     elif args.mode=="vision":start(use_emg=False,use_vision=True,show_preview=False)
-    elif args.mode=="live":start(show_preview=False)
+    elif args.mode=="live":start(show_preview=False,emg_source=args.emg_source)
     # Open the game immediately in Webcam + EMG mode too. Each game displays
     # a waiting screen and suppresses gameplay until fresh EMG samples and a
     # complete feature window arrive (see BaseGame.wait_for_required_emg).

@@ -6,7 +6,7 @@ from src.utils.config import load_settings
 from src.features.emg_features import extract
 from src.fusion.fusion_engine import FusionEngine
 
-command_bus=queue.Queue(maxsize=50); status_bus=queue.Queue(maxsize=10); stop=threading.Event(); lock=threading.Lock(); latest={"emg":None,"emg_level":None,"emg_features":None,"emg_sample_time":None,"emg_features_time":None,"vis":None,"frame":None,"pointer":None,"fist":False}
+command_bus=queue.Queue(maxsize=50); status_bus=queue.Queue(maxsize=10); stop=threading.Event(); lock=threading.Lock(); latest={"emg":None,"emg_level":None,"emg_features":None,"emg_sample_time":None,"emg_features_time":None,"vis":None,"vis_ts_ms":None,"frame":None,"pointer":None,"fist":False}
 
 EMG_FRESHNESS_SECONDS=2.5
 
@@ -42,11 +42,7 @@ def _emg():
                 dc=.999*dc+.001*value; y,zi=sosfilt(sos,[value-dc],zi=zi); y,nz=sosfilt(nsos,y,zi=nz); value=y[0]
             buf.append(value); count+=1
             if len(buf)==width and (count-width)%step==0:
-                features=extract(buf,signal_type)
-                with lock:
-                    latest["emg_level"]=float(features["RMS"])
-                    latest["emg_features"]=features
-                    latest["emg_features_time"]=time.monotonic()
+                publish_emg_features(extract(buf,signal_type))
     finally:
         port.close()
         with lock: latest["emg"] = None; latest["emg_level"] = None; latest["emg_features"] = None; latest["emg_sample_time"] = None; latest["emg_features_time"] = None
@@ -95,6 +91,7 @@ def _vision(show_preview=True):
     try:
         while not stop.is_set():
             ok,frame=cap.read()
+            frame_ts_ms=time.time()*1000
             if not ok or frame is None:
                 failed_frames+=1
                 if failed_frames>=30:
@@ -154,6 +151,7 @@ def _vision(show_preview=True):
                 tracker.draw_landmarks(display_frame,lm)
             with lock:
                 latest["vis"]=val
+                latest["vis_ts_ms"]=frame_ts_ms if val else None
                 latest["frame"]=display_frame
                 latest["pointer"]=pointer
                 latest["fist"]=stable_fist
@@ -169,6 +167,7 @@ def _vision(show_preview=True):
             latest["frame"] = None
             latest["pointer"] = None
             latest["vis"] = None
+            latest["vis_ts_ms"] = None
             latest["fist"] = False
         if show_preview: cv2.destroyWindow("Rehabilitation camera")
 
@@ -177,8 +176,10 @@ def _fusion(use_emg=True):
     while not stop.is_set():
         with lock:
             v=latest["vis"]
+            vision_ts_ms=latest["vis_ts_ms"]
             emg_features=latest["emg_features"] if use_emg else None
         cmd=fusion.fuse(vis=v,emg_features=emg_features)
+        cmd["vision_ts_ms"]=vision_ts_ms
         try: command_bus.put_nowait(cmd)
         except queue.Full:
             try: command_bus.get_nowait(); command_bus.put_nowait(cmd)
@@ -195,11 +196,23 @@ def _guard(fn,*args):
             try: status_bus.get_nowait(); status_bus.put_nowait(message)
             except queue.Empty: pass
 
-def start(use_emg=True,use_vision=True,show_preview=False):
+def publish_emg_features(features):
+    """Store a completed EMG feature window for the fusion thread and games."""
+    with lock:
+        latest["emg_level"]=float(features["RMS"])
+        latest["emg_features"]=features
+        latest["emg_features_time"]=time.monotonic()
+
+def start(use_emg=True,use_vision=True,show_preview=False,emg_source="serial"):
     stop.clear()
     with lock:
-        latest.update(emg=None,emg_level=None,emg_features=None,emg_sample_time=None,emg_features_time=None,vis=None,frame=None,pointer=None,fist=False)
-    if use_emg: threading.Thread(target=_guard,args=(_emg,),daemon=True).start()
+        latest.update(emg=None,emg_level=None,emg_features=None,emg_sample_time=None,emg_features_time=None,vis=None,vis_ts_ms=None,frame=None,pointer=None,fist=False)
+    if use_emg:
+        if emg_source=="replay":
+            from src.realtime.emg_replay import replay_emg as emg_target
+        elif emg_source=="serial": emg_target=_emg
+        else: raise ValueError("emg_source must be serial or replay")
+        threading.Thread(target=_guard,args=(emg_target,),daemon=True).start()
     if use_vision: threading.Thread(target=_guard,args=(_vision,show_preview),daemon=True).start()
     threading.Thread(target=_guard,args=(_fusion,use_emg),daemon=True).start()
 

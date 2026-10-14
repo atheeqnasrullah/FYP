@@ -119,6 +119,7 @@ class BalloonPop(BaseGame):
                 self.cmd=gesture
             else:
                 gesture=self.cmd
+                full_fist=gesture=="Hand_Close"  # keyboard C / simulator Hand_Close
             self.emg_rms=float((emg_features or {}).get("RMS",emg_level or 0.0))
             self.emg_mav=float((emg_features or {}).get("MAV",0.0))
             if pointer is not None:
@@ -127,7 +128,9 @@ class BalloonPop(BaseGame):
             else:
                 if self.cmd=="Left":x-=7
                 if self.cmd=="Right":x+=7
-                x=max(20,min(self.W-20,x))
+                if self.cmd=="Up":player_y-=7
+                if self.cmd=="Down":player_y+=7
+                x=max(20,min(self.W-20,x)); player_y=max(75,min(self.H-65,player_y))
             now=pygame.time.get_ticks()
             if now-last_spawn>1100:
                 balloons.append({"x":random.randint(72,self.W-72),"y":self.H+52,"color":random.choice(palette),"radius":random.randint(40,48),"speed":random.uniform(1.7,2.5),"state":"floating","hit_at":0})

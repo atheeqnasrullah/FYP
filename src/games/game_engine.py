@@ -2,9 +2,10 @@ import json, queue, time, sys
 from pathlib import Path
 import pygame
 from src.utils.config import ROOT, load_settings
+from src.utils.session_sync import PENDING, upload_session, sync_pending_sessions
 from src.realtime.pipeline import latest, lock, status_bus, emg_is_ready
 
-KEYMAP={pygame.K_LEFT:"Left",pygame.K_RIGHT:"Right",pygame.K_UP:"Wrist_Extension",pygame.K_DOWN:"Wrist_Flexion",pygame.K_o:"Hand_Open",pygame.K_c:"Hand_Close",pygame.K_s:"Supination",pygame.K_p:"Pronation",pygame.K_SPACE:"Rest"}
+KEYMAP={pygame.K_LEFT:"Left",pygame.K_RIGHT:"Right",pygame.K_UP:"Up",pygame.K_DOWN:"Down",pygame.K_o:"Hand_Open",pygame.K_c:"Hand_Close",pygame.K_s:"Supination",pygame.K_p:"Pronation",pygame.K_SPACE:"Rest"}
 
 class BaseGame:
     name="Base"
@@ -53,16 +54,19 @@ class BaseGame:
             except Exception as exc:
                 print(f"Pygame window activation warning: {exc}", flush=True)
         self.font=pygame.font.Font(None,30); self.bus=bus; self.patient=patient_id; self.score=0; self.attempts=[]; self.running=True; self.cmd="Rest"; self.started=time.monotonic(); self.target=None; self.target_t=None; self.confidence=0.; self.emg_rms=0.; self.emg_mav=0.
-        self.runtime_message=None
+        self.runtime_message=None; self.latencies=[]
     def read_input(self):
         for e in pygame.event.get():
             if e.type==pygame.QUIT: self.running=False
             elif e.type==pygame.KEYDOWN and e.key in KEYMAP: self.cmd=KEYMAP[e.key]; self.confidence=1.
             elif e.type==pygame.KEYUP and e.key in KEYMAP: self.cmd="Rest"; self.confidence=0.
+        item=None
         try:
             while True:
                 item=self.bus.get_nowait(); self.cmd=item.get("command","Rest"); self.confidence=item.get("confidence",0.)
         except queue.Empty: pass
+        if item is not None and item.get("vision_ts_ms") is not None:
+            self.latencies.append((self.cmd,time.time()*1000-item["vision_ts_ms"]))
         try:
             while True: self.runtime_message=status_bus.get_nowait()
         except queue.Empty: pass
@@ -121,13 +125,20 @@ class BaseGame:
     def save_session(self):
         payload={"patient_id":self.patient,"game_name":self.name,"total_score":self.score,"duration_s":int(time.monotonic()-self.started),"attempts":self.attempts}
         cfg=load_settings()
+        self.save_latency_log()
         try:
-            import requests
             base=cfg["backend_url"]
-            if not requests.get(f"{base}/patients",timeout=2).ok: raise RuntimeError("API unavailable")
-            if self.patient not in [x["patient_id"] for x in requests.get(f"{base}/patients",timeout=2).json()]: requests.post(f"{base}/patients",json={"patient_id":self.patient},timeout=2).raise_for_status()
-            requests.post(f"{base}/sessions",json=payload,timeout=3).raise_for_status()
+            upload_session(base,payload)
+            sync_pending_sessions(base)
         except Exception:
-            folder=ROOT/"data/logs"; folder.mkdir(parents=True,exist_ok=True)
-            with (folder/"pending_sessions.jsonl").open("a",encoding="utf-8") as f:f.write(json.dumps(payload)+"\n")
+            PENDING.parent.mkdir(parents=True,exist_ok=True)
+            with PENDING.open("a",encoding="utf-8") as f:f.write(json.dumps(payload)+"\n")
         pygame.quit()
+    def save_latency_log(self):
+        """Write camera-frame-to-game latency samples for src.evaluation.latency_report."""
+        if not self.latencies: return
+        folder=ROOT/"data/logs"; folder.mkdir(parents=True,exist_ok=True)
+        path=folder/f"latency_{self.name}_{time.strftime('%Y%m%d_%H%M%S')}.csv"
+        with path.open("w",encoding="utf-8") as f:
+            f.write("game,mode,command,latency_ms\n")
+            for command,latency in self.latencies: f.write(f"{self.name},{getattr(self,'control_mode','keyboard')},{command},{latency:.1f}\n")
