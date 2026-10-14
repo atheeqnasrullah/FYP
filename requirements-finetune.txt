@@ -1,0 +1,4 @@
+# Stage 7 only: install after approval. Python 3.11 venv.
+torch>=2.2
+momentfm
+peft
