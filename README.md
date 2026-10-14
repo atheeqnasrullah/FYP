@@ -4,7 +4,7 @@ A local research prototype for EMG and webcam driven upper limb rehabilitation g
 
 ## Quick start
 
-Python 3.10–3.11 is recommended. Create a virtual environment, install `requirements.txt`, then run `python main.py keyboard`. Use arrow keys, O/C, S/P and Space. Choose a game with `--game balloon|car|treasure|shape`. Run the API with `uvicorn backend.app:app --reload` and the dashboard with `streamlit run dashboard/dashboard.py`.
+Python 3.10–3.11 is required (3.11 recommended). Create a virtual environment, install `requirements.txt` (and `requirements-dev.txt` for tests), then run `python main.py keyboard`. Without the ESP32, `python main.py live --emg-source replay` uses a recorded healthy-volunteer EMG signal so Webcam + EMG mode still works. Full setup: [docs/user_guide.md](docs/user_guide.md). Use arrow keys, O/C, S/P and Space. Choose a game with `--game balloon|car|treasure|shape`. Run the API with `uvicorn backend.app:app --reload` and the dashboard with `streamlit run dashboard/dashboard.py`.
 
 `python main.py sim` feeds simulated commands; `python main.py vision` uses the webcam without EMG; `python main.py live` combines the webcam with the configured serial device. The webcam supplies movement labels to the games. The MD0437 signal supplies EMG activity features such as RMS and MAV; an EMG gesture model is not needed for game control. In combined mode, the fusion command carries the camera movement label and the current EMG activity measurements. Webcam video is rendered behind the game objects. Hardware capture and feature analysis are described below. Configuration is in `config/settings.yaml`.
 
@@ -28,10 +28,16 @@ The single-channel MD0437 is used to measure electrical signal activity, while c
 
 For the MD0437 sensor, `SIG` is a filtered and rectified muscle-activity envelope, not raw EMG. `config/settings.yaml` sets `signal_type: envelope`; offline feature building and live monitoring preserve this envelope and skip raw-EMG bandpass/notch filters. The webcam supplies labels such as Hand_Open, Hand_Close, Left, Right, Up and Down. Check the exact board's power requirements and keep SIG within the ESP32 ADC input range before wiring.
 
+## Datasets, results and tests
+
+`Datasets/` holds 11 healthy volunteers (raw and filtered) and 3 **synthetic** simulated patients, 7 gestures each. Build features with `python -m src.features.build_dataset --source public`, train the offline baselines with `python -m src.models.train_emg --features data/features/emg_features_public.csv`, and write activity/data-quality reports with `python -m src.evaluation.emg_activity_report`. The best single-channel baseline reaches 28.8% leave-one-subject-out accuracy on 7 gestures (chance 14.3%), which supports camera-driven control. Run `python -m pytest -q` for the 28 automated tests. Details: [docs/datasets.md](docs/datasets.md), [docs/testing_and_evaluation.md](docs/testing_and_evaluation.md), [docs/model_card_baseline.md](docs/model_card_baseline.md).
+
+Stage 7 (MOMENT-1 fine-tuning) is prepared but waits for approval: [docs/fine_tuning_moment.md](docs/fine_tuning_moment.md).
+
 ## API
 
-FastAPI docs are at `/docs`. Endpoints support patients, sessions, attempts, history, progress, and CSV exports. Local SQLite is stored in `data/rehab.db`. There is no authentication in this local prototype; do not expose it to a network or store identifying health data.
+FastAPI docs are at `/docs`; reference: [docs/api_reference.md](docs/api_reference.md). Sessions saved while the API is down are queued in `data/logs/pending_sessions.jsonl` and uploaded on the next save or from the dashboard sidebar. Endpoints support patients, sessions, attempts, history, progress, and CSV exports. Local SQLite is stored in `data/rehab.db`. There is no authentication in this local prototype; do not expose it to a network or store identifying health data.
 
 ## Project map
 
-`src/` signal processing, acquisition, ML, vision, fusion, games and runtime; `backend/` local API; `dashboard/` clinician dashboard; `firmware/` ESP32 sketch; `config/` settings; `docs/` protocols and ethics templates.
+`src/` signal processing, acquisition, datasets, ML, evaluation, vision, fusion, games and runtime; `tests/` pytest suite; `backend/` local API; `dashboard/` clinician dashboard; `firmware/` ESP32 sketch; `config/` settings; `docs/` user and developer guides, datasets, API, evaluation, model card, fine-tuning plan, protocols and ethics templates. Developer notes: [docs/developer_guide.md](docs/developer_guide.md).

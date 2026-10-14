@@ -192,6 +192,9 @@ Dashboard progress shows session score/accuracy, per-movement accuracy, average 
 
 **Synchronized sample columns:** `timestamp_ms, subject_id, session_id, trial_id, emg_value, label, vision_confidence, pointer_x, pointer_y`. The camera label is paired with the EMG sample; the camera video is not retained.
 
+| Public gesture datasets | `Datasets/` (11 healthy volunteers raw + filtered, 3 synthetic patients) | one gesture recording per column | Offline EMG baselines, activity analysis, EMG replay (`docs/datasets.md`) |
+| Subject splits | `results/splits.json` | one fold | Shared by the baseline and MOMENT-1 fine-tuning |
+
 **Rule:** split train/test **by subject or session**, never by random row, to avoid leakage.
 
 ## 7. Repository Structure
@@ -208,17 +211,18 @@ stroke-rehab-system/
 │   ├── acquisition/   fused_logger.py, emg_logger.py, landmark_recorder.py
 │   ├── preprocessing/ filters.py, windowing.py
 │   ├── features/      emg_features.py, vision_features.py
-│   ├── models/        train_emg.py, train_vision.py, evaluate.py, saved/
+│   ├── models/        train_emg.py, finetune_moment.py, saved/
 │   ├── vision/        hand_tracker.py
 │   ├── fusion/        fusion_engine.py
-│   ├── realtime/      pipeline.py, simulator.py
+│   ├── data/          public_datasets.py (Datasets/ loaders)
+│   ├── evaluation/    emg_activity_report.py, latency_report.py
+│   ├── realtime/      pipeline.py, simulator.py, emg_replay.py
 │   ├── games/         game_engine.py, balloon_pop.py, car_driving.py,
-│   │                  treasure_hunt.py, assets/
-│   └── utils/         logger.py, helpers.py
-├── backend/           app.py, database.py, models.py, routes/
+│   │                  treasure_hunt.py, shape_matching.py
+│   └── utils/         config.py, session_sync.py
+├── backend/           app.py
 ├── dashboard/         dashboard.py
-├── notebooks/
-├── tests/
+├── tests/             pytest suite (28 tests)
 ├── docs/
 └── results/           figures/, tables/
 ```

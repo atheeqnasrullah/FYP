@@ -65,14 +65,14 @@ Games (Weeks 10-12) can start earlier using the keyboard/simulator input, so the
 ## 6. Work Breakdown by Phase
 
 ### Phase 1: Planning
-- [ ] Define camera-derived movement labels and the EMG activity-measurement role
+- [x] Define camera-derived movement labels and the EMG activity-measurement role
 - [ ] Literature review (EMG gesture recognition, stroke rehab games, MediaPipe)
 - [ ] Submit ethics approval request and prepare consent form
-- [ ] Create GitHub repo and folder structure
+- [x] Create GitHub repo and folder structure
 
 ### Phase 2: Hardware
 - [ ] Build EMG front end and ESP32 wiring
-- [ ] Firmware: 1000 Hz sampling, serial output
+- [x] Firmware: 1000 Hz sampling, serial output
 - [ ] Verify signal: rest is flat, contraction increases amplitude
 - [ ] Document electrode placement with photos
 
@@ -82,45 +82,45 @@ Games (Weeks 10-12) can start earlier using the keyboard/simulator input, so the
 - [ ] Check serial samples, camera label counts, signal range and session metadata
 
 ### Phase 4: Processing and Features
-- [ ] Preserve the MD0437 envelope path without raw-EMG bandpass/notch filtering
-- [ ] Build 200 ms windows with 100 ms step
-- [ ] Extract RMS, MAV and other activity features
-- [ ] Compare EMG activity across camera-derived labels and sessions
+- [x] Preserve the MD0437 envelope path without raw-EMG bandpass/notch filtering
+- [x] Build 200 ms windows with 100 ms step
+- [x] Extract RMS, MAV and other activity features
+- [x] Compare EMG activity across camera-derived labels and sessions
 
 ### Phase 5: Machine Learning
-- [ ] Optional offline comparison of EMG features against camera-derived movement labels
-- [ ] Keep any EMG classifier out of runtime game control
-- [ ] Report activity-feature and camera-label performance separately
+- [x] Optional offline comparison of EMG features against camera-derived movement labels
+- [x] Keep any EMG classifier out of runtime game control
+- [x] Report activity-feature and camera-label performance separately (EMG done in `docs/testing_and_evaluation.md`; camera-label accuracy needs annotated sessions)
 
 ### Phase 6: Vision
-- [ ] Real-time hand tracking with MediaPipe
-- [ ] Rules or ML for Open/Close/Left/Right
+- [x] Real-time hand tracking with MediaPipe
+- [x] Rules or ML for Open/Close/Left/Right
 - [ ] Palm-facing and wrist-angle features for rotation and wrist
 - [ ] Record landmark dataset, validate accuracy
 
 ### Phase 7: Fusion and Real-Time
-- [ ] Implement fusion rules and smoothing
-- [ ] Real-time loop with threads
-- [ ] Simulator and keyboard fallback
-- [ ] Measure latency
+- [x] Implement fusion rules and smoothing
+- [x] Real-time loop with threads
+- [x] Simulator and keyboard fallback
+- [ ] Measure latency (instrumented: play in webcam mode, then `python -m src.evaluation.latency_report`)
 
 ### Phase 8: Games
-- [ ] BaseGame (input, scoring, timer, target scheduler, logging)
-- [ ] Balloon Pop
-- [ ] Car Driving (camera steering/brake, optional EMG activity monitor)
-- [ ] Treasure Hunt
-- [ ] Shape Matching
+- [x] BaseGame (input, scoring, timer, target scheduler, logging)
+- [x] Balloon Pop
+- [x] Car Driving (camera steering/brake, optional EMG activity monitor)
+- [x] Treasure Hunt
+- [x] Shape Matching
 - [ ] Difficulty levels and patient feedback visuals
 
 ### Phase 9: Monitoring
-- [ ] FastAPI backend and SQLite database
-- [ ] Session upload from games
-- [ ] Streamlit clinician dashboard
+- [x] FastAPI backend and SQLite database
+- [x] Session upload from games
+- [x] Streamlit clinician dashboard
 
 ### Phase 10: Testing, Evaluation and Documentation
-- [ ] Unit tests, integration tests, end-to-end run
+- [x] Unit tests, integration tests, end-to-end run (28 pytest tests; live webcam run still manual)
 - [ ] User testing with 5+ volunteers, SUS questionnaire
-- [ ] Final figures and tables
+- [ ] Final figures and tables (EMG figures/tables in `results/`; latency, vision and SUS pending)
 - [ ] Report, slides, demo video
 
 ## 7. Data Collection Plan
@@ -213,6 +213,12 @@ If time runs short, cut from the bottom up.
 7. Limitations and future work
 8. Conclusion
 9. References and appendices (code, consent form, protocol)
+
+### Phase 11: Foundation-model fine-tuning (final stage, needs approval)
+- [x] Select the model: MOMENT-1 (MIT licence, single-channel classification), see `docs/fine_tuning_moment.md`
+- [x] Prepare `src/models/finetune_moment.py` on the same subject splits as the baseline
+- [ ] Owner approval, then install `requirements-finetune.txt` and run holdout + LOSO
+- [ ] Compare with the LDA/SVM/RF baseline in the results chapter
 
 ## 14. Definition of Done
 
