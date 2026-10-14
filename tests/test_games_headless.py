@@ -195,3 +195,17 @@ def test_shape_matching_pick_and_drop_by_hand(monkeypatch):
     results = [(a["target_movement"], a["detected_movement"], a["correct"]) for a in saved["attempts"]]
     assert results == [("Square", "Wrong hole (Circle)", False), ("Square", "Square", True)]
     assert saved["total_score"] == 10
+
+
+def test_treasure_hunt_hand_joystick_needs_return_to_centre():
+    from src.games.treasure_hunt import TreasureHunt
+    game = TreasureHunt(queue.Queue(), "P01")
+    reach = game.joystick_radius()
+    assert game.joystick((0.5, 0.5)) is None
+    assert game.joystick((0.5 - reach - 0.05, 0.5)) == "Left"
+    # Holding the hand out, or swinging it back through the centre, does not step again.
+    assert game.joystick((0.5 - reach - 0.08, 0.5)) is None
+    assert game.joystick((0.5 + reach * 0.4, 0.5)) is None
+    assert game.joystick((0.5, 0.5)) is None
+    assert game.joystick((0.5, 0.5 + (reach + 0.05) / 0.75)) == "Down"
+    import pygame; pygame.quit()

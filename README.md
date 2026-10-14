@@ -20,7 +20,7 @@ The dashboard has a launcher for four games. Select a game and patient code, the
 
 **Hand Gesture Shape Matching** is a wooden shape sorter: move the hand cursor over a shape on the shelf, make a fist to pick it up, carry it to the hole with the same shape and open your hand to drop it. The shape under the cursor glows, the carried shape's hole pulses (with a guide line and shape names on easier levels), and a label tells you when to grab or release. Dropping on the wrong hole counts as a mistake and the shape floats back to the shelf; dropping away from any hole does not. Webcam + EMG also displays RMS/MAV activity measurements. If the camera is off, use the mouse or Space key.
 
-**Treasure Hunt** is an island grid: move your hand left, right, up or down to walk one square towards the nearest chest (a yellow arrow shows the way), then open your hand to unlock the chest and close it to grab the gold. Clearing every chest moves you to a new island.
+**Treasure Hunt** is an island grid. In webcam modes your hand works like a joystick: push it left, right, up or down from the centre to walk one square, then bring it back to the centre for the next step (so returning the hand never walks the explorer backwards). A yellow arrow and a footprint trail lead to the nearest chest; on a chest, open your hand to unlock it and make a fist to grab the gold. A panel beside the island shows the camera picture with the joystick zones, the arrow to follow and your hand position, or the gesture to make at a chest. Keyboard mode uses the arrow keys, O and C.
 
 ### Game sessions
 
