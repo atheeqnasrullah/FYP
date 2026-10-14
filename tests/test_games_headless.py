@@ -157,3 +157,41 @@ def test_car_vision_mode_follows_hand(monkeypatch):
         with pipeline.lock:
             pipeline.latest["pointer"] = None; pipeline.latest["vis"] = None
     assert 0 in seen[5:20] and seen[-1] == 2
+
+
+def test_shape_matching_pick_and_drop_by_hand(monkeypatch):
+    from src.games.shape_matching import ShapeMatching
+    from src.realtime import pipeline
+    saved = {}
+    monkeypatch.setattr(engine, "upload_session", lambda base, payload: saved.update(payload))
+    monkeypatch.setattr(engine, "sync_pending_sessions", lambda base: (0, 0))
+    game = ShapeMatching(queue.Queue(), "P01")
+    game.control_mode = "vision"
+    layout = (["Circle", "Square", "Triangle"],
+              {"Circle": (230, 200), "Square": (450, 200), "Triangle": (670, 200)},
+              {"Circle": (260, 480), "Square": (450, 480), "Triangle": (640, 480)})
+    monkeypatch.setattr(game, "new_round", lambda round_no: layout)
+    gain = game.reach_gain()
+    to_camera = lambda x, y: ((x / game.W - .5) / gain + .5, (y / game.H - .5) / gain + .5)
+    # Square to the circle hole (wrong), then square to its own hole (right).
+    plan = [((450, 480), False)] * 8 + [((450, 480), True)] * 6 + [((230, 200), True)] * 12 + [((230, 200), False)] * 20 \
+         + [((450, 480), False)] * 6 + [((450, 480), True)] * 6 + [((450, 200), True)] * 12 + [((450, 200), False)] * 10
+    original = game.read_input
+    state = {"n": 0}
+    def scripted():
+        original()
+        n = state["n"]; state["n"] += 1
+        (x, y), fist = plan[min(n, len(plan) - 1)]
+        with pipeline.lock:
+            pipeline.latest["pointer"] = to_camera(x, y)
+            pipeline.latest["vis"] = ("Hand_Close" if fist else "Hand_Open", .9)
+        if n >= len(plan): game.running = False
+    game.read_input = scripted
+    try:
+        game.run()
+    finally:
+        with pipeline.lock:
+            pipeline.latest["pointer"] = None; pipeline.latest["vis"] = None
+    results = [(a["target_movement"], a["detected_movement"], a["correct"]) for a in saved["attempts"]]
+    assert results == [("Square", "Wrong hole (Circle)", False), ("Square", "Square", True)]
+    assert saved["total_score"] == 10

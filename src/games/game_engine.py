@@ -229,13 +229,13 @@ class BaseGame:
         if getattr(self,"control_mode","keyboard") in ("vision","live"):
             return "Move your hand to play   |   Enter pause   |   M sound   |   Esc finish"
         return "Arrows move   O open   C close   |   Enter pause   |   M sound   |   Esc finish"
-    def info(self,lines,color=INK):
+    def info(self,lines,color=INK,shadow=True):
         """Game-specific status lines, stacked below the top bar."""
         y=74+(28 if self.runtime_message else 0)
         for line in lines:
             if line is None: continue
             text,col=(line if isinstance(line,tuple) else (line,color))
-            self.text(text,(16,y),col,24); y+=26
+            self.text(text,(16,y),col,24,shadow=shadow); y+=26
         return y
     def hud(self):
         self.panel((0,0,self.W,62),175,radius=0)

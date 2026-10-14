@@ -18,7 +18,7 @@ Camera gesture detection combines finger-joint angles with palm-normalized finge
 
 The dashboard has a launcher for four games. Select a game and patient code, then click **Start selected game**. The Pygame window opens on the computer running Streamlit; it does not render inside the browser. In webcam modes, the camera video appears as the background inside the game window, behind the game objects. Progress includes score/accuracy and available average EMG RMS/MAV by detected movement. Press Esc to finish and save the session, or use **Stop running game** in the dashboard.
 
-**Hand Gesture Shape Matching** uses the camera pointer and camera Hand_Close/Hand_Open labels to pick up and drop shapes. Webcam + EMG also displays RMS/MAV activity measurements. If the camera is off, use the mouse or Space key.
+**Hand Gesture Shape Matching** is a wooden shape sorter: move the hand cursor over a shape on the shelf, make a fist to pick it up, carry it to the hole with the same shape and open your hand to drop it. The shape under the cursor glows, the carried shape's hole pulses (with a guide line and shape names on easier levels), and a label tells you when to grab or release. Dropping on the wrong hole counts as a mistake and the shape floats back to the shelf; dropping away from any hole does not. Webcam + EMG also displays RMS/MAV activity measurements. If the camera is off, use the mouse or Space key.
 
 **Treasure Hunt** is an island grid: move your hand left, right, up or down to walk one square towards the nearest chest (a yellow arrow shows the way), then open your hand to unlock the chest and close it to grab the gold. Clearing every chest moves you to a new island.
 
