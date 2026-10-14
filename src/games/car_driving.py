@@ -11,6 +11,20 @@ class CarDriving(BaseGame):
     HORIZON = 95
     CAR_Y = 475
     LANES = 3
+    how_to_play = (
+        "Move your hand LEFT or RIGHT to change lane.",
+        "Steer the way the sign at the top asks.",
+        "Avoid the other cars: change lane before you reach them.",
+        "Close your hand to brake.",
+    )
+
+    def prompt_text(self):
+        return f"Steer {self.target.upper()}" if self.target in ("Left", "Right") else super().prompt_text()
+
+    def controls_hint(self):
+        if getattr(self, "control_mode", "keyboard") in ("vision", "live"):
+            return "Hand left/right to steer   Close hand to brake   |   Enter pause   |   M sound   |   Esc finish"
+        return "Left/Right arrows steer   C brake   |   Enter pause   |   M sound   |   Esc finish"
 
     def road_half_width(self, y):
         progress = max(0.0, min(1.0, (y - self.HORIZON) / (self.H - self.HORIZON)))
@@ -123,6 +137,7 @@ class CarDriving(BaseGame):
         self.emg_rms=0.0
         collision_until=0
         rendered_frames=0
+        self.begin()
 
         while self.running:
             self.read_input()
@@ -143,6 +158,9 @@ class CarDriving(BaseGame):
             self.emg_mav=float((emg_features or {}).get("MAV",0.0))
             emg_peak=max(emg_peak,self.emg_rms,1.0)
 
+            # Difficulty sets top speed and how often other cars appear.
+            max_speed=self.difficulty.value(4.0,8.0)
+            spawn_ms=self.difficulty.value(2100,950)
             if braking:
                 speed=0.0
             elif pygame.time.get_ticks() >= collision_until:
@@ -161,7 +179,7 @@ class CarDriving(BaseGame):
                     self.target_set(target)
             last_steer=direction
 
-            if speed>1.0 and now-last_spawn>1450:
+            if speed>1.0 and now-last_spawn>spawn_ms:
                 obstacles.append([random.randrange(self.LANES),float(self.HORIZON+30),random.choice(((75,157,205),(221,165,58),(154,112,187)))])
                 last_spawn=now
             road_offset=(road_offset+speed)%62
@@ -176,6 +194,7 @@ class CarDriving(BaseGame):
                 collision_until=now+900
                 speed=0.0
                 self.score=max(0,self.score-5)
+                self.miss("Crash! Change lane earlier")
 
             debug_frame=rendered_frames==0
             if debug_frame: print("Car Driving first frame: background",flush=True)
@@ -189,20 +208,20 @@ class CarDriving(BaseGame):
             if debug_frame: print("Car Driving first frame: car and HUD",flush=True)
             self.draw_player_car(round(car_x),braking)
             self.hud()
-            self.text(f"Target steer: {target.upper()}    Speed: {speed:.1f}    Distance: {distance:.1f} m",(15,49),(255,255,255),24)
+            lines=[f"Speed {speed*12:.0f} km/h   Distance {distance:.1f} m"]
             if emg_level is None:
-                message="EMG activity sensor unavailable" if getattr(self,"control_mode","keyboard")=="live" else "EMG features: Webcam Only mode"
-                self.text(message,(15,79),(255,210,130),22)
+                if getattr(self,"control_mode","keyboard")=="live": lines.append(("EMG activity sensor unavailable",(255,210,130)))
+                y=self.info(lines)
             else:
                 percent=min(100,int(self.emg_rms/emg_peak*100))
-                self.text(f"EMG RMS: {self.emg_rms:.1f}   MAV: {self.emg_mav:.1f}   Relative activity: {percent}% of session peak",(15,79),(210,245,225),22)
-                pygame.draw.rect(self.screen,(36,42,48),(15,105,180,12),border_radius=5)
-                pygame.draw.rect(self.screen,(57,208,142),(15,105,int(180*percent/100),12),border_radius=5)
-            self.text("Move hand LEFT/RIGHT to steer | Close hand to brake | Esc to finish",(15,self.H-58),(245,245,235),22)
+                lines.append((f"EMG RMS {self.emg_rms:.1f}   MAV {self.emg_mav:.1f}   Activity {percent}% of session peak",(210,245,225)))
+                y=self.info(lines)
+                pygame.draw.rect(self.screen,(36,42,48),(16,y+2,180,12),border_radius=5)
+                pygame.draw.rect(self.screen,(57,208,142),(16,y+2,int(180*percent/100),12),border_radius=5)
             if braking:
-                self.text("BRAKING",(self.W-150,55),(255,95,75),28)
+                self.text("BRAKING",(round(car_x),self.CAR_Y-85),(255,95,75),34,center=True)
             elif now<collision_until:
-                self.text("Obstacle hit — steer to another lane",(self.W//2-170,145),(255,225,125),25)
+                self.text("Obstacle hit - steer to another lane",(self.W//2,150),(255,225,125),28,center=True)
             pygame.display.flip()
             if rendered_frames == 0:
                 pixels=pygame.surfarray.array3d(self.screen)

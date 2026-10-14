@@ -7,6 +7,8 @@ def main():
     parser.add_argument("mode",nargs="?",choices=["keyboard","sim","vision","live"],default="keyboard")
     parser.add_argument("--game",choices=["balloon","car","treasure","shape"],default="balloon")
     parser.add_argument("--patient",default="P01")
+    parser.add_argument("--difficulty",choices=["auto","easy","medium","hard"],help="game difficulty; auto adapts to the patient (default from config/settings.yaml)")
+    parser.add_argument("--duration",type=int,help="session length in seconds; 0 = no time limit (default from config/settings.yaml)")
     parser.add_argument("--emg-source",choices=["serial","replay"],default="serial",help="live mode: ESP32 serial stream or a Datasets/ recording replayed at 1 kHz")
     args=parser.parse_args()
     if args.mode=="sim":start_simulator()
@@ -23,6 +25,8 @@ def main():
         else:from src.games.shape_matching import ShapeMatching as Game
         game=Game(command_bus,args.patient)
         game.control_mode=args.mode
+        if args.difficulty: game.difficulty_mode=args.difficulty
+        if args.duration is not None: game.session_seconds=max(0,args.duration)
         print(f"Pygame video driver: {__import__('pygame').display.get_driver()}; window info: {__import__('pygame').display.get_wm_info()}",flush=True)
         print(f"Pygame window created for {args.game}",flush=True)
         game.run()

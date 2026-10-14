@@ -17,3 +17,8 @@ lr_motion_hold_ms: 350
 lr_motion_cooldown_ms: 280
 camera_index: 0
 backend_url: "http://127.0.0.1:8000"
+# Rehabilitation games
+game_session_seconds: 180   # session length; 0 = no time limit (--duration overrides)
+game_difficulty: auto       # auto adapts to the patient, or easy / medium / hard
+game_sound: true            # sound effects (press M in a game to mute)
+game_show_screens: true     # start screen, countdown and results screen

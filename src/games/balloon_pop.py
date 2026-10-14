@@ -78,26 +78,20 @@ def draw_balloon(surface, x, y, color, radius, tick):
 class BalloonPop(BaseGame):
     name="Balloon_Pop"
 
-    @staticmethod
-    def make_pop_sound():
-        """Create a short synthesized pop; return None when audio is unavailable."""
-        try:
-            if not pygame.mixer.get_init():
-                pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
-            sample_rate = 22050
-            t = np.arange(int(sample_rate * .17), dtype=np.float32) / sample_rate
-            rng = np.random.default_rng()
-            envelope = np.exp(-t * 25)
-            wave = (rng.normal(0, .48, len(t)) + .75 * np.sin(2 * np.pi * 105 * t)) * envelope
-            samples = np.asarray(np.clip(wave, -1, 1) * 32767, dtype=np.int16)
-            return pygame.mixer.Sound(buffer=samples.tobytes())
-        except (pygame.error, OSError):
-            return None
+    how_to_play=(
+        "Move your hand to aim the ring at a balloon.",
+        "Close all five fingers into a fist to pop it.",
+        "Open your hand again before the next pop.",
+        "Balloons that float away count as misses.",
+    )
+
+    def prompt_text(self):
+        return "Make a fist on a balloon"
 
     def run(self):
-        clock=pygame.time.Clock(); x=self.W//2; player_y=130; balloons=[]; fragments=[]; bursts=[]; last_spawn=0; last_action=0; was_closed=False; self.target_set("Hand_Close")
+        clock=pygame.time.Clock(); x=self.W//2; player_y=160; balloons=[]; fragments=[]; bursts=[]; last_spawn=0; last_action=0; was_closed=False; self.target_set("Hand_Close")
         palette=((235,70,95),(70,165,245),(255,190,55),(165,105,230),(70,205,155))
-        pop_sound=self.make_pop_sound()
+        self.begin()
         while self.running:
             self.read_input()
             if not self.running: break
@@ -124,32 +118,42 @@ class BalloonPop(BaseGame):
             self.emg_mav=float((emg_features or {}).get("MAV",0.0))
             if pointer is not None:
                 x=max(20,min(self.W-20,int(pointer[0]*self.W)))
-                player_y=max(75,min(self.H-65,int(pointer[1]*self.H)))
+                player_y=max(80,min(self.H-50,int(pointer[1]*self.H)))
             else:
                 if self.cmd=="Left":x-=7
                 if self.cmd=="Right":x+=7
                 if self.cmd=="Up":player_y-=7
                 if self.cmd=="Down":player_y+=7
-                x=max(20,min(self.W-20,x)); player_y=max(75,min(self.H-65,player_y))
+                x=max(20,min(self.W-20,x)); player_y=max(80,min(self.H-50,player_y))
             now=pygame.time.get_ticks()
-            if now-last_spawn>1100:
-                balloons.append({"x":random.randint(72,self.W-72),"y":self.H+52,"color":random.choice(palette),"radius":random.randint(40,48),"speed":random.uniform(1.7,2.5),"state":"floating","hit_at":0})
+            # Difficulty sets how often balloons appear, how fast they rise,
+            # how big they are and how precisely the fist has to land.
+            spawn_ms=self.difficulty.value(1600,750)
+            speed=self.difficulty.value(1.3,2.9)
+            radius=round(self.difficulty.value(54,38))
+            tolerance=self.difficulty.value(26,10)
+            if now-last_spawn>spawn_ms:
+                balloons.append({"x":random.randint(72,self.W-72),"y":self.H+52,"color":random.choice(palette),"radius":random.randint(radius-4,radius+4),"speed":random.uniform(speed-.35,speed+.35),"state":"floating","hit_at":0})
                 last_spawn=now
             for balloon in balloons:
                 if balloon["state"]=="floating":
                     balloon["y"]-=balloon["speed"]
-            balloons=[b for b in balloons if b["state"]!="floating" or b["y"]>-55]
+            escaped=[b for b in balloons if b["state"]=="floating" and b["y"]<=-55]
+            for balloon in escaped:
+                balloons.remove(balloon)
+                self.log("Missed"); self.target_set("Hand_Close")
+                self.popup("Missed one",(255,170,150),28,(balloon["x"],105))
             # In Webcam + EMG mode, keep the game and camera controls active
             # while the sensor is disconnected, but require a fresh complete
             # EMG feature window before a fist can trigger a balloon pop.
             closed=full_fist and (mode!="live" or sensor_ready)
             if closed and not was_closed and now-last_action>250:
-                hit=next((b for b in balloons if b["state"]=="floating" and math.hypot(b["x"]-x,b["y"]-player_y)<b["radius"]+16),None)
+                hit=next((b for b in balloons if b["state"]=="floating" and math.hypot(b["x"]-x,b["y"]-player_y)<b["radius"]+tolerance),None)
                 if hit:
                     hit["state"]="expanding"; hit["hit_at"]=now
                     self.log("Hand_Close"); self.target_set("Hand_Close"); last_action=now
                     bursts.append({"x":hit["x"],"y":hit["y"],"color":hit["color"],"created":now,"duration":430})
-                    if pop_sound is not None: pop_sound.play()
+                    self.sound("pop")
             was_closed=closed
 
             for balloon in list(balloons):
@@ -179,14 +183,14 @@ class BalloonPop(BaseGame):
             cursor_color=(255,224,70) if not closed else (255,110,90)
             pygame.draw.circle(self.screen,cursor_color,(x,player_y),17,3 if pointer is not None else 0)
             self.hud()
+            lines=[]
             if mode=="live" and not sensor_ready:
-                self.text("Aim with your hand; balloon pop is disabled until fresh EMG data arrives",(15,48),(255,220,110),22)
-            else:
-                self.text("Close all five fingers into a fist on a balloon to pop | Move index finger to aim",(15,48),(245,245,235),22)
+                lines.append(("Aim with your hand; popping is paused until fresh EMG data arrives",(255,220,110)))
             if emg_level is not None:
-                self.text(f"EMG activity features: RMS {self.emg_rms:.1f} | MAV {self.emg_mav:.1f}",(15,76),(210,245,225),21)
+                lines.append((f"EMG activity: RMS {self.emg_rms:.1f} | MAV {self.emg_mav:.1f}",(210,245,225)))
             elif mode=="live":
-                self.text("EMG activity: sensor unavailable",(15,76),(255,210,130),21)
+                lines.append(("EMG activity: sensor unavailable",(255,210,130)))
+            self.info(lines)
             pygame.display.flip();clock.tick(30)
             if pygame.key.get_pressed()[pygame.K_ESCAPE]:self.running=False
         self.save_session()

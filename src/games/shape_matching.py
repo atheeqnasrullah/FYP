@@ -1,4 +1,6 @@
 import math
+import random
+
 import pygame
 
 from src.games.game_engine import BaseGame
@@ -38,19 +40,42 @@ def draw_shape(surface, name, center, size, color, width=0):
 
 class ShapeMatching(BaseGame):
     name = "Shape_Matching"
+    how_to_play = (
+        "Move your hand so the pointer is over a coloured shape.",
+        "Close your hand to pick it up.",
+        "Carry it to the outline with the same shape.",
+        "Open your hand to drop it. Finish the round to get new shapes.",
+    )
+    SIZE = 34
+
+    def controls_hint(self):
+        if getattr(self, "control_mode", "keyboard") in ("vision", "live"):
+            return "Close hand to pick up   Open hand to drop   |   Enter pause   |   M sound   |   Esc finish"
+        return "Mouse to point   Hold left-click or Space to drag   |   Enter pause   |   M sound   |   Esc finish"
+
+    def new_round(self, round_no):
+        """Pick shapes for this round; more shapes and a tighter drop zone as the level rises."""
+        count = max(3, min(len(SHAPES), round(self.difficulty.value(3, 6))))
+        names = random.sample(SHAPES, count)
+        columns = min(3, count)
+        rows = math.ceil(count / columns)
+        slots = [(self.W * (c + 1) // (columns + 1), 190 + r * 140) for r in range(rows) for c in range(columns)]
+        random.shuffle(slots)
+        targets = {name: slots[i] for i, name in enumerate(names)}
+        homes = {name: (self.W * (i + 1) // (count + 1), 505) for i, name in enumerate(names)}
+        return names, targets, homes
 
     def run(self):
         clock = pygame.time.Clock()
-        size = 34
-        targets = {
-            name: (150 + (i % 3) * 300, 175 + (i // 3) * 130)
-            for i, name in enumerate(SHAPES)
-        }
-        homes = {name: (75 + i * 150, 520) for i, name in enumerate(SHAPES)}
-        positions = {name: list(homes[name]) for name in SHAPES}
+        size = self.SIZE
+        self.begin()
+        round_no = 1
+        names, targets, homes = self.new_round(round_no)
+        positions = {name: list(homes[name]) for name in names}
         matched = set()
         active_shape = None
         was_grabbing = False
+        round_done_at = None
         self.target_set("Pick up a shape")
         while self.running:
             self.read_input()
@@ -73,10 +98,19 @@ class ShapeMatching(BaseGame):
             grabbing = camera_gesture == "Hand_Close" if hardware_controls else manual_grab
             self.emg_rms = float((emg_features or {}).get("RMS", 0.0))
             self.emg_mav = float((emg_features or {}).get("MAV", 0.0))
+            snap = self.difficulty.value(80, 42)
+
+            # Next round starts a moment after the last shape is placed.
+            if round_done_at is not None and pygame.time.get_ticks() - round_done_at > 1800:
+                round_no += 1
+                names, targets, homes = self.new_round(round_no)
+                positions = {name: list(homes[name]) for name in names}
+                matched = set(); active_shape = None; round_done_at = None
+                self.target_set("Pick up a shape")
 
             # Vision controls pointer and grasp; EMG remains an activity measurement.
-            if grabbing and not was_grabbing and active_shape is None:
-                available = [name for name in SHAPES if name not in matched]
+            if round_done_at is None and grabbing and not was_grabbing and active_shape is None:
+                available = [name for name in names if name not in matched]
                 if available:
                     nearest = min(available, key=lambda name: math.dist((px, py), positions[name]))
                     if math.dist((px, py), positions[nearest]) <= size + 28:
@@ -88,11 +122,18 @@ class ShapeMatching(BaseGame):
 
             if was_grabbing and not grabbing and active_shape is not None:
                 shape = active_shape
-                if math.dist(positions[shape], targets[shape]) <= 62:
+                if math.dist(positions[shape], targets[shape]) <= snap:
                     positions[shape] = list(targets[shape])
                     matched.add(shape)
                     self.log(shape)
-                    self.target_set("All matched" if len(matched) == len(SHAPES) else "Pick up a shape")
+                    if len(matched) == len(names):
+                        self.score += 20
+                        self.popup(f"Round {round_no} complete! +20", (110, 231, 160), 40)
+                        self.sound("chest")
+                        round_done_at = pygame.time.get_ticks()
+                        self.target_set("Well done!")
+                    else:
+                        self.target_set("Pick up a shape")
                 else:
                     positions[shape] = list(homes[shape])
                     self.log("Incorrect drop")
@@ -103,26 +144,25 @@ class ShapeMatching(BaseGame):
 
             self.draw_camera_background((27, 35, 53), overlay_alpha=28)
 
-            for name in SHAPES:
-                pygame.draw.circle(self.screen, (225, 230, 240), targets[name], size + 12, 2)
+            for name in names:
+                glow = active_shape == name
+                pygame.draw.circle(self.screen, (255, 214, 92) if glow else (225, 230, 240), targets[name], size + 14, 3 if glow else 2)
                 draw_shape(self.screen, name, targets[name], size, (225, 230, 240), 3)
+            for name in names:
                 draw_shape(self.screen, name, positions[name], size, (95, 235, 155) if name in matched else COLORS[name])
 
-            pygame.draw.circle(self.screen, (255, 255, 255), (px, py), 10, 2)
-            pygame.draw.circle(self.screen, (60, 220, 255), (px, py), 4)
+            pygame.draw.circle(self.screen, (255, 255, 255), (px, py), 12, 3)
+            pygame.draw.circle(self.screen, (255, 120, 90) if grabbing else (60, 220, 255), (px, py), 5)
 
             self.hud()
-            self.text(f"Matched: {len(matched)}/{len(SHAPES)}", (self.W - 175, 48), (245, 245, 245), 22)
+            lines = [f"Round {round_no}   Placed {len(matched)} of {len(names)}"]
             if hardware_controls and emg_features:
-                self.text(f"Camera gesture: {camera_gesture} | EMG RMS {self.emg_rms:.1f} | MAV {self.emg_mav:.1f}", (15, 80), (245, 245, 245), 22)
+                lines.append((f"Camera gesture: {camera_gesture} | EMG RMS {self.emg_rms:.1f} | MAV {self.emg_mav:.1f}", (210, 245, 225)))
             elif getattr(self, "control_mode", "keyboard") == "live":
-                self.text("EMG activity unavailable; camera control remains active.", (15, 80), (255, 220, 130), 22)
+                lines.append(("EMG activity unavailable; camera control remains active.", (255, 220, 130)))
             elif not hardware_controls:
-                self.text("Fallback: point with hand or mouse; hold left-click or Space to pick/drag, release to drop.", (15, 80), (255, 220, 130), 22)
-            else:
-                self.text(f"Camera gesture: {camera_gesture} | Close hand to pick, open to drop", (15, 80), (245, 245, 245), 22)
-            if len(matched) == len(SHAPES):
-                self.text("All shapes matched!", (self.W // 2 - 105, self.H // 2 - 15), (110, 255, 165), 38)
+                lines.append(("Point with your hand or the mouse; hold left-click or Space to drag.", (255, 220, 130)))
+            self.info(lines)
 
             pygame.display.flip()
             clock.tick(30)

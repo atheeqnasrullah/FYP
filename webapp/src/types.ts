@@ -85,6 +85,8 @@ export interface GameStatus {
     game_name: string
     mode: string
     patient_id: string
+    difficulty?: string
+    duration_s?: number
     started_at: string
     exit_code: number | null
   } | null

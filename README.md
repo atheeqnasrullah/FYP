@@ -18,6 +18,14 @@ The dashboard has a launcher for four games. Select a game and patient code, the
 
 **Hand Gesture Shape Matching** uses the camera pointer and camera Hand_Close/Hand_Open labels to pick up and drop shapes. Webcam + EMG also displays RMS/MAV activity measurements. If the camera is off, use the mouse or Space key.
 
+**Treasure Hunt** is an island grid: move your hand left, right, up or down to walk one square towards the nearest chest (a yellow arrow shows the way), then open your hand to unlock the chest and close it to grab the gold. Clearing every chest moves you to a new island.
+
+### Game sessions
+
+Every game opens with a how-to-play screen (start with Space, or by holding an open hand), counts down 3-2-1, and runs for a set time with a timer at the top. The prompt at the top always names the movement to make next. Press Enter to pause, M to mute sound, Esc to finish early. At the end a results screen shows score, accuracy, good movements per movement type, best streak, average reaction time and the patient's previous best, and the session is saved.
+
+Difficulty is `auto` by default: after several successes in a row the game speeds up (faster balloons, faster traffic, more chests and obstacles, more shapes and a tighter drop zone) and after misses it slows down. The level is remembered per patient and game in `data/logs/game_levels.json`, so the next session starts where the last one ended. Choose a fixed level or session length in the web app's Game Launcher, with `python main.py vision --game car --difficulty easy --duration 120`, or with `game_difficulty`, `game_session_seconds`, `game_sound` and `game_show_screens` in `config/settings.yaml`.
+
 ## Web application (React + TypeScript)
 
 `webapp/` is an all-in-one web app that manages the whole system from the browser: a dashboard with overall statistics, patient records (add/edit/delete, progress charts, CSV export), every recorded session with per-attempt drill-down, a game launcher (choose game, input mode and patient; start/stop and view the live log), an EMG dataset explorer (signal plots, RMS/MAV/VAR/peak/WL features, healthy vs patient group comparison) and an editor for `config/settings.yaml`. It also imports sessions that games saved offline to `data/logs/pending_sessions.jsonl`.

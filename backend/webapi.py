@@ -180,10 +180,15 @@ LOG = ROOT / "data/logs/dashboard_game.log"
 _running: dict = {"proc": None, "info": None}
 
 
+DIFFICULTIES = ("auto", "easy", "medium", "hard")
+
+
 class Launch(BaseModel):
     game: str
     mode: str
     patient_id: str
+    difficulty: str = "auto"
+    duration_s: int = Field(default=180, ge=0, le=3600)
 
 
 def _status():
@@ -214,9 +219,12 @@ def launch(req: Launch):
         raise HTTPException(400, f"Mode '{req.mode}' is not available for {game['name']}")
     if not PATIENT_RE.match(req.patient_id.strip()):
         raise HTTPException(400, "Patient code must start with P and contain only letters, numbers, _ or - (up to 21 characters).")
+    if req.difficulty not in DIFFICULTIES:
+        raise HTTPException(400, "Difficulty must be auto, easy, medium or hard")
     if _status()["running"]:
         raise HTTPException(409, "A game is already running. Stop it before starting another.")
-    command = [sys.executable, "-u", str(ROOT / "main.py"), req.mode, "--game", req.game, "--patient", req.patient_id.strip()]
+    command = [sys.executable, "-u", str(ROOT / "main.py"), req.mode, "--game", req.game, "--patient", req.patient_id.strip(),
+               "--difficulty", req.difficulty, "--duration", str(req.duration_s)]
     options = {"cwd": str(ROOT), "stdin": subprocess.DEVNULL}
     if sys.platform == "win32":
         options["creationflags"] = subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP
@@ -231,7 +239,7 @@ def launch(req: Launch):
         raise HTTPException(500, f"Could not start the game: {exc}")
     _running["proc"] = proc
     _running["info"] = {"game": req.game, "game_name": game["name"], "mode": req.mode, "patient_id": req.patient_id.strip(),
-                        "started_at": datetime.now(timezone.utc).isoformat(), "exit_code": None}
+                        "difficulty": req.difficulty, "duration_s": req.duration_s, "started_at": datetime.now(timezone.utc).isoformat(), "exit_code": None}
     return _status()
 
 

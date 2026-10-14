@@ -7,6 +7,20 @@ import { useAsync } from '../hooks'
 import { PATIENT_RE } from './PatientForm'
 
 const GAME_ART: Record<string, string> = { balloon: '🎈', car: '🚗', treasure: '🗺️', shape: '🔷' }
+const DIFFICULTY: Record<string, string> = {
+  auto: 'Adapts to the patient: gets harder after several successes in a row and easier after misses. The level is remembered for the next session.',
+  easy: 'Slow and forgiving: bigger targets, fewer obstacles.',
+  medium: 'Moderate speed and precision.',
+  hard: 'Fast, smaller targets and more obstacles.',
+}
+const DURATIONS = [
+  { value: 60, label: '1 min' },
+  { value: 120, label: '2 min' },
+  { value: 180, label: '3 min' },
+  { value: 300, label: '5 min' },
+  { value: 600, label: '10 min' },
+  { value: 0, label: 'No limit' },
+]
 const MODE_HELP: Record<string, string> = {
   vision: 'The webcam identifies hand gestures and movement direction; its video appears behind the game objects.',
   live: 'Webcam labels control the game; the EMG sensor adds RMS/MAV activity feedback. The window waits until fresh EMG data arrives.',
@@ -23,6 +37,8 @@ export default function Games() {
   const [game, setGame] = useState('balloon')
   const [mode, setMode] = useState('vision')
   const [patient, setPatient] = useState(params.get('patient') ?? '')
+  const [difficulty, setDifficulty] = useState('auto')
+  const [duration, setDuration] = useState(180)
   const [busy, setBusy] = useState(false)
   const toast = useToast()
 
@@ -42,7 +58,7 @@ export default function Games() {
   const start = async () => {
     setBusy(true)
     try {
-      await api.launchGame(game, mode, patient)
+      await api.launchGame(game, mode, patient, difficulty, duration)
       toast(`${selected?.name} started — play in the game window on this computer`, 'good')
       status.reload()
       log.reload()
@@ -100,6 +116,28 @@ export default function Games() {
                   <small className="muted">{MODE_HELP[mode]}</small>
                 </label>
                 <label>
+                  Difficulty
+                  <div className="segmented">
+                    {Object.keys(DIFFICULTY).map((d) => (
+                      <button key={d} type="button" className={d === difficulty ? 'active' : ''} onClick={() => setDifficulty(d)}>
+                        {d === 'auto' ? 'Auto (adaptive)' : d[0].toUpperCase() + d.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                  <small className="muted">{DIFFICULTY[difficulty]}</small>
+                </label>
+                <label>
+                  Session length
+                  <select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
+                    {DURATIONS.map((d) => (
+                      <option key={d.value} value={d.value}>
+                        {d.label}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="muted">The game shows a countdown timer and a results screen when time is up.</small>
+                </label>
+                <label>
                   Patient code
                   <input list="patient-codes" value={patient} onChange={(e) => setPatient(e.target.value.trim())} placeholder="P01" />
                   <datalist id="patient-codes">
@@ -139,6 +177,15 @@ export default function Games() {
                   </dd>
                   <dt>Mode</dt>
                   <dd>{info.data.modes[last.mode]}</dd>
+                  {last.difficulty && (
+                    <>
+                      <dt>Difficulty</dt>
+                      <dd>
+                        {last.difficulty === 'auto' ? 'Auto (adaptive)' : last.difficulty[0].toUpperCase() + last.difficulty.slice(1)}
+                        {last.duration_s !== undefined && ` · ${last.duration_s ? `${Math.round(last.duration_s / 60)} min` : 'no time limit'}`}
+                      </dd>
+                    </>
+                  )}
                   <dt>Started</dt>
                   <dd>{dateTime(last.started_at)}</dd>
                   {running ? (
@@ -156,7 +203,9 @@ export default function Games() {
               ) : (
                 <p className="muted">No game has been launched from the web app since the API started.</p>
               )}
-              <p className="caption">Press Esc in the game window to finish and save the session. Stopping from here ends the game without saving.</p>
+              <p className="caption">
+                In the game: Enter pauses, M mutes sound, Esc finishes early and saves. Stopping from here ends the game without saving.
+              </p>
             </Card>
           </div>
 
