@@ -18,6 +18,12 @@ The dashboard has a launcher for four games. Select a game and patient code, the
 
 **Hand Gesture Shape Matching** uses the camera pointer and camera Hand_Close/Hand_Open labels to pick up and drop shapes. Webcam + EMG also displays RMS/MAV activity measurements. If the camera is off, use the mouse or Space key.
 
+## Web application (React + TypeScript)
+
+`webapp/` is an all-in-one web app that manages the whole system from the browser: a dashboard with overall statistics, patient records (add/edit/delete, progress charts, CSV export), every recorded session with per-attempt drill-down, a game launcher (choose game, input mode and patient; start/stop and view the live log), an EMG dataset explorer (signal plots, RMS/MAV/VAR/peak/WL features, healthy vs patient group comparison) and an editor for `config/settings.yaml`. It also imports sessions that games saved offline to `data/logs/pending_sessions.jsonl`.
+
+Node.js 18+ is required. For development, start the API (`uvicorn backend.app:app --reload`) and in another terminal run `cd webapp && npm install && npm run dev`, then open http://localhost:5173 (requests to `/api` are proxied to port 8000). To serve it from the API instead, run `npm run build` once; FastAPI then serves the built app at http://127.0.0.1:8000/ui. As with the API, there is no authentication: keep it on the local machine.
+
 ## Data and model workflow
 
 To collect **EMG only, without a webcam**, run `python -m src.acquisition.emg_logger S01 3 --labels Rest Hand_Open Hand_Close Left Right Up Down --separate-files --ordered`. The terminal prompts you before each 4-second trial; perform the named movement, and the logger records raw sensor samples with the label you selected. This creates one file per label, such as `data/raw/emg/S01_session3_Rest.csv`. It refuses to overwrite these files, so choose a new session number for another recording. Close Arduino Serial Monitor first and configure the ESP32 COM port and 921600 baud in `config/settings.yaml`.
@@ -40,4 +46,4 @@ FastAPI docs are at `/docs`; reference: [docs/api_reference.md](docs/api_referen
 
 ## Project map
 
-`src/` signal processing, acquisition, datasets, ML, evaluation, vision, fusion, games and runtime; `tests/` pytest suite; `backend/` local API; `dashboard/` clinician dashboard; `firmware/` ESP32 sketch; `config/` settings; `docs/` user and developer guides, datasets, API, evaluation, model card, fine-tuning plan, protocols and ethics templates. Developer notes: [docs/developer_guide.md](docs/developer_guide.md).
+`src/` signal processing, acquisition, datasets, ML, evaluation, vision, fusion, games and runtime; `tests/` pytest suite; `backend/` local API; `webapp/` React + TypeScript web app; `dashboard/` clinician dashboard; `firmware/` ESP32 sketch; `config/` settings; `docs/` user and developer guides, datasets, API, evaluation, model card, fine-tuning plan, protocols and ethics templates. Developer notes: [docs/developer_guide.md](docs/developer_guide.md).

@@ -15,6 +15,7 @@ def home():
     return {
         "message": "Rehabilitation Session API is running.",
         "dashboard": "http://127.0.0.1:8501",
+        "web_app": "/ui",
         "api_docs": "/docs",
         "health": "/health",
     }
@@ -114,3 +115,14 @@ def export(pid:str):
     if not rows: raise HTTPException(404,"No sessions found")
     buff=io.StringIO(); writer=csv.DictWriter(buff,fieldnames=rows[0].keys()); writer.writeheader(); writer.writerows(map(dict,rows)); buff.seek(0)
     return StreamingResponse(iter([buff.getvalue()]),media_type="text/csv",headers={"Content-Disposition":f"attachment; filename={pid}_sessions.csv"})
+
+# React web application support (webapp/): extra endpoints, CORS for the Vite
+# dev server, and the production build served at /ui when it has been built.
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from backend.webapi import router as web_router
+
+app.add_middleware(CORSMiddleware,allow_origins=["http://localhost:5173","http://127.0.0.1:5173"],allow_methods=["*"],allow_headers=["*"])
+app.include_router(web_router)
+WEBAPP_DIST=ROOT/"webapp/dist"
+if WEBAPP_DIST.is_dir(): app.mount("/ui",StaticFiles(directory=WEBAPP_DIST,html=True),name="webapp")
