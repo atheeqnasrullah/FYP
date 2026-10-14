@@ -5,7 +5,7 @@ import { api } from '../api'
 import { ChartBox, useChartStyle } from '../components/charts'
 import { SessionModal } from '../components/SessionModal'
 import { Badge, Card, Empty, ErrorBox, Loading, Modal, PageHeader, Stat, accuracyTone, useToast } from '../components/ui'
-import { dateTime, duration, gameLabel, pct, shortDate, sig } from '../format'
+import { dateTime, duration, gameLabel, movement, pct, relativeDay, shortDate, sig } from '../format'
 import { useAsync } from '../hooks'
 import type { Session } from '../types'
 import { PatientForm } from './PatientForm'
@@ -153,14 +153,14 @@ export default function PatientDetail() {
           </Card>
 
           <div className="grid-2">
-            <Card title="Accuracy by target movement">
+            <Card title="Accuracy by movement">
               {progress.data.movement_accuracy.length === 0 ? (
                 <Empty title="No attempts recorded" />
               ) : (
                 <ChartBox height={260}>
-                  <BarChart data={progress.data.movement_accuracy.map((m) => ({ ...m, accuracy: m.accuracy * 100 }))}>
+                  <BarChart data={progress.data.movement_accuracy.map((m) => ({ ...m, name: movement(m.target_movement), accuracy: m.accuracy * 100 }))}>
                     <CartesianGrid {...chart.grid} />
-                    <XAxis dataKey="target_movement" {...chart.axis} />
+                    <XAxis dataKey="name" {...chart.axis} interval={0} tick={{ ...chart.axis.tick, fontSize: 11 }} />
                     <YAxis domain={[0, 100]} unit="%" {...chart.axis} width={44} />
                     <Tooltip {...chart.tooltip} formatter={(v: number) => `${v.toFixed(0)}%`} />
                     <Bar dataKey="accuracy" name="Accuracy" fill={chart.color(0)} radius={[4, 4, 0, 0]} maxBarSize={40} />
@@ -173,9 +173,9 @@ export default function PatientDetail() {
                 <Empty title="No EMG activity recorded">Play in “Webcam + EMG sensor” mode to record RMS/MAV activity features.</Empty>
               ) : (
                 <ChartBox height={260}>
-                  <BarChart data={progress.data.emg_activity_by_movement}>
+                  <BarChart data={progress.data.emg_activity_by_movement.map((m) => ({ ...m, name: movement(m.movement) }))}>
                     <CartesianGrid {...chart.grid} />
-                    <XAxis dataKey="movement" {...chart.axis} />
+                    <XAxis dataKey="name" {...chart.axis} interval={0} tick={{ ...chart.axis.tick, fontSize: 11 }} />
                     <YAxis {...chart.axis} width={48} tickFormatter={(v) => sig(v)} />
                     <Tooltip {...chart.tooltip} formatter={(v: number) => sig(v)} />
                     <Legend {...chart.legend} />
@@ -205,7 +205,7 @@ export default function PatientDetail() {
                   {[...sessions].reverse().map((s) => (
                     <tr key={s.session_id} onClick={() => setSelected(s)}>
                       <td>{s.session_id}</td>
-                      <td>{dateTime(s.started_at)}</td>
+                      <td title={dateTime(s.started_at)}>{relativeDay(s.started_at)}</td>
                       <td>{gameLabel(s.game_name)}</td>
                       <td className="r">{s.total_score}</td>
                       <td className="r">{duration(s.duration_s)}</td>

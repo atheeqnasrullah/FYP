@@ -1,6 +1,6 @@
 import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api'
-import { dateTime, duration, gameLabel, pct, sig } from '../format'
+import { dateTime, duration, gameLabel, movement, pct, sig } from '../format'
 import { useAsync } from '../hooks'
 import type { Session } from '../types'
 import { ChartBox, useChartStyle } from './charts'
@@ -58,8 +58,8 @@ export function SessionModal({ session, onClose }: { session: Session; onClose: 
                 {data.map((a, i) => (
                   <tr key={a.attempt_id}>
                     <td>{i + 1}</td>
-                    <td>{a.target_movement}</td>
-                    <td>{a.detected_movement}</td>
+                    <td>{movement(a.target_movement)}</td>
+                    <td>{movement(a.detected_movement)}</td>
                     <td>
                       <Badge tone={a.correct ? 'good' : 'bad'}>{a.correct ? 'Correct' : 'Missed'}</Badge>
                     </td>

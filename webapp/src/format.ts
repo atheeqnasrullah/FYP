@@ -31,3 +31,38 @@ export const duration = (s: number) => {
 }
 
 export const gameLabel = (name: string) => name.replace(/_/g, ' ')
+
+const MOVEMENTS: Record<string, string> = {
+  Hand_Close: 'Close hand',
+  Hand_Open: 'Open hand',
+  Left: 'Move left',
+  Right: 'Move right',
+  Up: 'Move up',
+  Down: 'Move down',
+  Supination: 'Palm up',
+  Pronation: 'Palm down',
+  Rest: 'Rest',
+  Missed: 'Missed',
+}
+
+/** Movement or shape label in plain words (Hand_Close -> Close hand). */
+export const movement = (label: string | null | undefined) => (label ? (MOVEMENTS[label] ?? label.replace(/_/g, ' ')) : '—')
+
+/** "today", "yesterday", "3 days ago", "2 weeks ago" … */
+export const relativeDay = (iso: string | null | undefined, now = new Date()) => {
+  if (!iso) return 'Never'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  const days = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / 86400000)
+  if (days <= 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 14) return `${days} days ago`
+  if (days < 60) return `${Math.round(days / 7)} weeks ago`
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+export const daysSince = (iso: string | null | undefined, now = new Date()) => {
+  if (!iso) return null
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? null : Math.floor((now.getTime() - d.getTime()) / 86400000)
+}

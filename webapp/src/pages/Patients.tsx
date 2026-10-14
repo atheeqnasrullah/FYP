@@ -1,14 +1,20 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { Badge, Card, Empty, ErrorBox, Loading, Modal, PageHeader, accuracyTone, useToast } from '../components/ui'
-import { dateTime, pct } from '../format'
+import { pct, relativeDay } from '../format'
+import { Sparkline, TrendChip } from '../components/Trend'
 import { useAsync } from '../hooks'
 import { PatientForm } from './PatientForm'
 
 export default function Patients() {
   const { data, error, loading, reload } = useAsync(() => api.patients(), [])
-  const [adding, setAdding] = useState(false)
+  const [params, setParams] = useSearchParams()
+  const [adding, setAddingState] = useState(params.get('add') === '1')
+  const setAdding = (v: boolean) => {
+    setAddingState(v)
+    if (!v && params.get('add')) setParams({}, { replace: true })
+  }
   const [query, setQuery] = useState('')
   const toast = useToast()
   const navigate = useNavigate()
@@ -49,8 +55,9 @@ export default function Patients() {
                     <th>Age</th>
                     <th>Affected side</th>
                     <th className="r">Sessions</th>
-                    <th className="r">Best score</th>
                     <th className="r">Avg accuracy</th>
+                    <th>Recent accuracy</th>
+                    <th>Trend</th>
                     <th>Last session</th>
                   </tr>
                 </thead>
@@ -65,9 +72,14 @@ export default function Patients() {
                       <td>{p.age ?? '—'}</td>
                       <td>{p.affected_side ?? '—'}</td>
                       <td className="r">{p.sessions}</td>
-                      <td className="r">{p.best_score ?? '—'}</td>
                       <td className="r">{p.sessions ? <Badge tone={accuracyTone(p.avg_accuracy)}>{pct(p.avg_accuracy)}</Badge> : '—'}</td>
-                      <td>{dateTime(p.last_session)}</td>
+                      <td>
+                        <Sparkline values={p.recent_accuracy} />
+                      </td>
+                      <td>
+                        <TrendChip trend={p.trend} />
+                      </td>
+                      <td>{relativeDay(p.last_session)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -62,12 +62,24 @@ class PatientUpdate(BaseModel):
 
 @router.get("/patients/summary")
 def patient_summary():
+    """Patients with totals plus a short accuracy history for trend lines and attention flags."""
     with closing(_connect()) as c:
-        return [dict(r) for r in c.execute(
+        rows = [dict(r) for r in c.execute(
             """SELECT p.*, COUNT(s.session_id) sessions, AVG(s.accuracy) avg_accuracy,
                MAX(s.started_at) last_session, MAX(s.total_score) best_score
                FROM patients p LEFT JOIN sessions s USING(patient_id)
                GROUP BY p.patient_id ORDER BY p.patient_id""")]
+        history = {}
+        for r in c.execute("SELECT patient_id, accuracy, game_name FROM sessions ORDER BY started_at"):
+            history.setdefault(r["patient_id"], []).append((r["accuracy"], r["game_name"]))
+    for row in rows:
+        accs = [a for a, _ in history.get(row["patient_id"], [])]
+        row["recent_accuracy"] = [round(a, 4) for a in accs[-10:]]
+        recent, previous = accs[-3:], accs[-6:-3]
+        row["trend"] = (sum(recent) / len(recent) - sum(previous) / len(previous)) if recent and previous else None
+        games = [g for _, g in history.get(row["patient_id"], [])]
+        row["last_game"] = games[-1] if games else None
+    return rows
 
 
 @router.get("/patients/{pid}")
@@ -167,13 +179,17 @@ def sync_pending():
 # ---------------------------------------------------------------- game launcher
 GAMES = [
     {"id": "balloon", "name": "Balloon Pop", "modes": ["vision", "live", "keyboard", "sim"],
-     "description": "Reach toward balloons and perform the requested hand movement to pop them."},
-    {"id": "car", "name": "Car Driving", "modes": ["vision", "live"],
-     "description": "Move your hand left/right to steer between lanes; close your hand to brake."},
+     "description": "Reach to a balloon and make a full fist to pop it, then open the hand again.",
+     "trains": ["Reaching", "Hand close", "Hand open"]},
+    {"id": "car", "name": "Car Driving", "modes": ["vision", "live", "keyboard", "sim"],
+     "description": "Hold the hand left, middle or right to pick a lane and catch stars; a fist brakes.",
+     "trains": ["Side-to-side reach", "Holding a position", "Hand close"]},
     {"id": "treasure", "name": "Treasure Hunt", "modes": ["vision", "live", "keyboard", "sim"],
-     "description": "Navigate the map with directional hand movements to collect treasure."},
+     "description": "Push the hand like a joystick to walk the island, then open and close it at each chest.",
+     "trains": ["Left / right / up / down", "Hand open", "Hand close"]},
     {"id": "shape", "name": "Hand Gesture Shape Matching", "modes": ["vision", "live", "keyboard", "sim"],
-     "description": "Use the pointer and hand close/open gestures to pick up and drop shapes."},
+     "description": "Grasp a shape with a fist, carry it to the matching hole and release it.",
+     "trains": ["Grasp and release", "Reaching", "Precision"]},
 ]
 MODES = {"vision": "Webcam only", "live": "Webcam + EMG sensor", "keyboard": "Keyboard controls", "sim": "Simulator"}
 LOG = ROOT / "data/logs/dashboard_game.log"

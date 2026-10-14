@@ -11,6 +11,9 @@ export interface PatientSummary extends Patient {
   avg_accuracy: number | null
   last_session: string | null
   best_score: number | null
+  recent_accuracy: number[]
+  trend: number | null
+  last_game: string | null
 }
 
 export interface Session {
@@ -70,6 +73,7 @@ export interface GameDef {
   name: string
   modes: string[]
   description: string
+  trains?: string[]
 }
 
 export interface GamesInfo {
