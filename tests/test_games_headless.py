@@ -117,3 +117,43 @@ def test_latency_recorded_from_vision_commands(monkeypatch):
     game.read_input()
     assert game.latencies and 45 <= game.latencies[0][1] < 1000
     import pygame; pygame.quit()
+
+
+def test_car_hand_position_picks_lane(monkeypatch):
+    from src.games.car_driving import CarDriving
+    monkeypatch.setattr(engine, "upload_session", lambda base, payload: None)
+    monkeypatch.setattr(engine, "sync_pending_sessions", lambda base: (0, 0))
+    game = CarDriving(queue.Queue(), "P01")
+    left, right = game.zone_edges()
+    assert game.zone_lane(left - 0.05, 1) == 0 and game.zone_lane(right + 0.05, 1) == 2
+    assert game.zone_lane(0.5, 0) == 1 and game.zone_lane(0.5, 2) == 1
+    # Inside the dead band next to an edge the car keeps its lane instead of flickering.
+    assert game.zone_lane(left, 0) == 0 and game.zone_lane(left, 1) == 1
+    import pygame; pygame.quit()
+
+
+def test_car_vision_mode_follows_hand(monkeypatch):
+    from src.games.car_driving import CarDriving
+    from src.realtime import pipeline
+    monkeypatch.setattr(engine, "upload_session", lambda base, payload: None)
+    monkeypatch.setattr(engine, "sync_pending_sessions", lambda base: (0, 0))
+    game = CarDriving(queue.Queue(), "P01")
+    game.control_mode = "vision"
+    seen = []
+    original = game.read_input
+    state = {"n": 0}
+    def hand_left_then_right():
+        original()
+        n = state["n"]; state["n"] += 1
+        with pipeline.lock:
+            pipeline.latest["pointer"] = (0.1, 0.5) if n < 20 else (0.9, 0.5)
+            pipeline.latest["vis"] = ("Hand_Open", 0.9)
+        seen.append(game.lane)
+        if n >= 40: game.running = False
+    game.read_input = hand_left_then_right
+    try:
+        game.run()
+    finally:
+        with pipeline.lock:
+            pipeline.latest["pointer"] = None; pipeline.latest["vis"] = None
+    assert 0 in seen[5:20] and seen[-1] == 2
