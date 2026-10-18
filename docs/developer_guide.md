@@ -1,68 +1,66 @@
 # Developer guide
 
-How the code fits together, where to change things, and the rules that keep the design consistent.
-
-## Runtime data flow
-
-```text
-ESP32 (1 kHz CSV "ms,adc") --serial--> pipeline._emg ----------.
-   or Datasets/ recording --> emg_replay.replay_emg -----------+--> latest["emg_features"] (RMS, MAV, ...)
-Webcam --> pipeline._vision (MediaPipe + rules + motion) --> latest["vis"], ["pointer"], ["fist"], ["vis_ts_ms"]
-pipeline._fusion (every 50 ms) --> FusionEngine.fuse --> command_bus (queue, 50)
-Game loop (30 fps) --> BaseGame.read_input --> game logic --> attempts --> save_session --> API / pending queue
-```
-
-All threads share `latest` under `pipeline.lock`. `pipeline.start(use_emg, use_vision, show_preview, emg_source)` starts them; `shutdown()` sets `stop`.
+How the code fits together, where to change things, and the rules that keep the design consistent. Read [architecture.md](architecture.md) first.
 
 ## Design rules
 
-1. **The camera decides movements.** EMG is an activity measurement (RMS, MAV). No EMG classifier controls a game; offline classifiers (`src/models/`) are research only.
-2. **One label vocabulary at runtime:** `config/labels.yaml` (`runtime_labels()` in `src/utils/config.py`). The keyboard map, simulator and games all use these labels. Supination/Pronation exist only as keyboard bonus keys in Treasure Hunt.
-3. **Signal type matters.** `envelope` (MD0437 SIG, rectified datasets) skips the bandpass/notch; `raw` gets 20-450 Hz bandpass and 50 Hz notch. Set it per source, never globally for mixed data.
-4. **Split by subject.** Evaluate EMG models leave-one-subject-out or on held-out subjects (`results/splits.json`), never by random window: windows overlap by 50%.
-5. **Synthetic data stays labelled.** `cohort == "simulated_patient"` is never presented as clinical evidence.
+1. **The camera decides movements.** EMG is an activity measurement (RMS, MAV). No EMG classifier controls a game; `src/models/` is offline research only.
+2. **One label vocabulary at runtime:** `config/labels.yaml`, read by `runtime_labels()` in `src/utils/config.py`. The keyboard map, simulator and games use these labels. Supination/Pronation exist only as keyboard keys for Treasure Hunt's lock.
+3. **Signal type and sample rate matter.** `envelope` skips the bandpass/notch; `raw` gets 20-450 Hz bandpass and 50 Hz notch. `fs` converts window milliseconds to samples, so it must match the data (1000 for the live ESP32, 100 for `Dataset/`).
+4. **Split by subject.** Evaluate EMG models leave-one-subject-out or on held-out subjects, never by random window: windows overlap by 50%.
+5. **Synthetic data stays labelled.** The synthetic stroke patient is never presented as clinical evidence.
+6. **Local only.** No authentication exists; never bind the API to a public interface.
 
 ## Module map
 
 | Path | Responsibility |
 |---|---|
-| `src/acquisition/` | EMG-only logger, fused EMG + camera logger, landmark recorder |
-| `src/data/public_datasets.py` | Load Datasets/ into long format |
+| `main.py` | Parse mode, game, patient, difficulty, duration, EMG source; start threads; run the game |
+| `src/acquisition/` | `emg_logger` (EMG-only trials), `fused_logger` (EMG + camera labels), `landmark_recorder` (hand landmarks) |
+| `src/data/public_datasets.py` | Loader for the removed `Datasets/` folder (needs migrating to `Dataset/`) |
 | `src/preprocessing/` | `clean()` filters, `make_windows()` |
-| `src/features/` | `extract()` 8 features; `build_dataset.py --source ...` |
-| `src/models/train_emg.py` | LDA/SVM/RF baselines: LOSO, within-subject, cross-cohort; writes metrics, confusion matrices, `splits.json` |
-| `src/models/finetune_moment.py` | Stage 7, MOMENT-1 fine-tuning (needs approval and `requirements-finetune.txt`) |
-| `src/evaluation/` | `emg_activity_report.py` (activity + data quality), `latency_report.py` |
-| `src/vision/hand_tracker.py` | MediaPipe wrapper (Solutions or Tasks API), hand features, `rule_classify` |
-| `src/fusion/fusion_engine.py` | Confidence gate, majority smoothing, attach EMG features |
-| `src/realtime/` | `pipeline.py` threads, `simulator.py`, `emg_replay.py` |
-| `src/games/` | `BaseGame` + four games |
+| `src/features/` | `extract()` 8 features; `build_dataset.py` |
+| `src/models/train_emg.py` | LDA/SVM/RF baselines: LOSO, within-subject, cross-cohort; metrics, confusion matrices, `results/splits.json` |
+| `src/models/finetune_moment.py` | MOMENT-1 fine-tuning (pending approval) |
+| `src/evaluation/` | `emg_activity_report.py`, `latency_report.py` |
+| `src/vision/hand_tracker.py` | MediaPipe wrapper, hand features, `rule_classify` |
+| `src/fusion/fusion_engine.py` | Confidence gate, majority smoothing, EMG attachment |
+| `src/realtime/` | `pipeline.py` (threads, `latest`, command bus), `simulator.py`, `emg_replay.py` |
+| `src/games/` | `game_engine.py` (`BaseGame`), four games, `difficulty.py`, `summary.py`, `audio.py` |
 | `src/utils/` | `config.py` (settings, labels, env overrides), `session_sync.py` |
-| `backend/app.py` | FastAPI + SQLite |
-| `dashboard/dashboard.py` | Streamlit launcher and progress views |
-| `firmware/emg_acquisition/` | ESP32 sketch, GPIO34, 1 kHz, 921600 baud |
-
-## Vision logic (summary)
-
-`HandTracker.features` computes finger curl angles, fingertip reach normalised by palm size, pinch ratio, a strict `full_fist`, palm centre and orientation. `rule_classify` returns `Hand_Close` for a pinch or a closed hand, `Hand_Open` for three or more extended fingers, else `Rest`. `_vision` smooths labels over `vision_smoothing_frames` (60% majority) and detects Left/Right/Up/Down from palm displacement against an anchor (`lr_motion_threshold`, `ud_motion_threshold`), holding a direction for `lr_motion_hold_ms` with a cooldown.
+| `backend/app.py` | Session API and SQLite schema; mounts `webapi` and `/ui` |
+| `backend/webapi.py` | Web app endpoints: overview, patients, sessions, game launcher, datasets, settings |
+| `webapp/` | RehabHub (React + TypeScript), see [web_app.md](web_app.md) |
+| `dashboard/dashboard.py` | Streamlit launcher and progress views (older) |
+| `firmware/emg_acquisition/` | ESP32 sketch |
 
 ## Adding a game
 
-1. Subclass `BaseGame` in `src/games/`, set `name`, implement `run()`.
-2. Each frame: `self.read_input()`; in live mode call `self.wait_for_required_emg()`; read `self.cmd` (and `latest["pointer"]` for pointing).
-3. Call `self.target_set(label)` when a new target appears and `self.log(detected)` when the player acts.
+1. Subclass `BaseGame` in `src/games/`, set `name` and `how_to_play`, implement `run()`.
+2. Call `self.begin()` first (start screen, countdown, difficulty); each frame call `self.read_input()` and, in live mode, `self.wait_for_required_emg()`; read `self.cmd` and `latest["pointer"]`.
+3. Call `self.target_set(label)` when a new target appears and `self.log(detected)` when the player acts; `self.miss()` for failures that are not movements. Use `self.difficulty.value(easy, hard)` for every tunable.
 4. End with `self.save_session()`.
-5. Register it in `main.py` (`--game`) and `dashboard.py` (`GAMES`), and add a headless test in `tests/test_games_headless.py`.
+5. Register it in `main.py` (`--game`), `backend/webapi.py` (`GAMES`) and `dashboard/dashboard.py` (`GAMES`), add a card image in `webapp/public/games/`, and add a headless test in `tests/test_games_headless.py`.
+
+## Adding an API endpoint
+
+Add it to `backend/webapi.py` (web app features) or `backend/app.py` (anything games call), add a typed call in `webapp/src/api.ts` and a type in `webapp/src/types.ts`, and a test in `tests/test_backend.py`.
 
 ## Environment variables
 
 | Variable | Effect |
 |---|---|
 | `EMG_SERIAL_PORT` | Overrides `serial_port` |
-| `REHAB_DB` | SQLite path for the API (tests use a temp file) |
-| `EMG_REPLAY_SOURCE`, `EMG_REPLAY_SUBJECT` | Replay recording (default `healthy_raw`, first subject) |
-| `SDL_VIDEODRIVER=dummy` | Headless Pygame (tests) |
+| `REHAB_DB` | SQLite path for the API |
+| `REHAB_GAME_STATE` | Path of the per-patient difficulty file |
+| `REHAB_SKIP_SCREENS` | Skip start and results screens (tests) |
+| `EMG_REPLAY_SOURCE`, `EMG_REPLAY_SUBJECT` | Replay recording (needs migrating to `Dataset/`) |
+| `SDL_VIDEODRIVER=dummy`, `SDL_AUDIODRIVER=dummy` | Headless Pygame (tests) |
 
 ## Tests
 
-`python -m pytest -q` runs 28 tests in about 20 s: signal processing, fusion, datasets and evaluation helpers, API, session sync, EMG replay through the pipeline, all four games headless, and the dashboard script. See `docs/testing_and_evaluation.md`.
+`python -m pytest -q` runs 39 tests (33 pass, 6 fail on the removed `Datasets/`). See [testing_and_evaluation.md](testing_and_evaluation.md). Web app checks: `cd webapp && npm run lint && npm run build`.
+
+## Git
+
+Work on a feature branch, keep `main` runnable, and keep raw data, the database, logs and saved models out of commits (`.gitignore` already does this).
