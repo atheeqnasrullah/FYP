@@ -50,20 +50,25 @@ def resample_segment(t, x):
     return grid, values, ~observed
 
 
+def segments_from_frame(df, subject, label, cohort):
+    """Continuous segments of one recording (columns timestamp_ms, adc_value), resampled to the 10 ms grid."""
+    t = df.timestamp_ms.to_numpy(float); x = pd.to_numeric(df.adc_value, errors="coerce").to_numpy(float)
+    seg = segment_ids(t); records = []
+    for s in np.unique(seg):
+        keep = (seg == s) & np.isfinite(x)
+        if keep.sum() < 2: continue
+        grid, values, interp = resample_segment(t[keep], x[keep])
+        records.append({"subject": subject, "cohort": cohort, "label": label,
+                        "segment": f"{subject}_{label}_{s}", "t": grid, "adc": values, "interp": interp})
+    return records
+
+
 def load_segments(source):
     """One record per continuous segment: resampled raw ADC values and flags."""
     records = []
     for path in files(source):
         df = read_file(path)
-        subject, label = str(df.subject_id.iloc[0]), str(df.movement_label.iloc[0])
-        t = df.timestamp_ms.to_numpy(float); x = pd.to_numeric(df.adc_value, errors="coerce").to_numpy(float)
-        seg = segment_ids(t)
-        for s in np.unique(seg):
-            keep = (seg == s) & np.isfinite(x)
-            if keep.sum() < 2: continue
-            grid, values, interp = resample_segment(t[keep], x[keep])
-            records.append({"subject": subject, "cohort": SOURCES[source]["cohort"], "label": label,
-                            "segment": f"{subject}_{label}_{s}", "t": grid, "adc": values, "interp": interp})
+        records += segments_from_frame(df, str(df.subject_id.iloc[0]), str(df.movement_label.iloc[0]), SOURCES[source]["cohort"])
     return records
 
 

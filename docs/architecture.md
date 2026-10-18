@@ -195,6 +195,7 @@ Deleting a patient in the web app deletes their sessions, and attempts go with t
 | `data/raw/vision/*.csv` | Landmark recorder | 21 landmarks (x, y, z) per frame + label |
 | `data/features/*.csv`, `results/` | Feature builder, trainer, reports | Window features, metrics, figures, subject splits |
 | `data/processed/moment/` | `src.data.prepare_finetune` | Fine-tuning windows (`windows.npz`), `manifest.csv`, `metadata.json` |
+| `models/moment/<run>/` (committed) | `src.models.finetune_moment` | Fine-tuned adapters, metrics, logs, settings for each run |
 | `config/settings.yaml` | You or the web app Settings page | All tunables |
 
 Raw data, the database, logs, feature tables and saved models are kept out of git by `.gitignore`. `Dataset/` is committed.
@@ -223,6 +224,7 @@ FYP/
 ├── dashboard/                dashboard.py (Streamlit, older)
 ├── Dataset/                  Healthy_person/S01-S09, stroke_patient/SYN_STROKE_01
 ├── data/                     models/ (MediaPipe), raw/, features/, logs/
+├── models/moment/            committed fine-tuning runs (LoRA adapters, metrics, logs)
 ├── results/                  tables/, figures/, splits.json
 ├── tests/                    44 pytest tests
 └── docs/                     this documentation

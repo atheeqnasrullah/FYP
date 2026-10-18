@@ -84,7 +84,37 @@ Installed and tested: torch 2.14.1 (MPS available), momentfm 0.1.4, peft 0.13.2,
 1. **Phase A, linear probe:** frozen encoder, train only the classification head (3,591 parameters); up to 15 epochs, learning rate 1e-3, early stopping after 4 epochs without validation improvement.
 2. **Phase B, LoRA:** rank-8 adapters on the encoder's attention q and v projections plus the head (118,279 trainable parameters); up to 15 epochs, learning rate 2e-4, same early stopping.
 3. Evaluate both phases on the held-out subjects, and the LoRA model also on the synthetic patient.
-4. Write `results/tables/moment_small_<split>_metrics.csv`, `results/figures/confusion_moment_small_<split>.png`, and save the last fold's adapter, labels and training arguments to `src/models/saved/moment_small_<split>/`.
+4. Save everything about the run in one committed folder, `models/moment/<run>/` (next section).
+
+## Outputs and sharing
+
+Every run creates `models/moment/<size>_<split>_<YYYYmmdd-HHMMSS>/`, which is tracked by git, and adds a row to `models/moment/runs.csv`:
+
+| File | Contents |
+|---|---|
+| `folds/<test subjects>/adapter_model.safetensors` | The fine-tuned weights: LoRA adapters and the trained classification head (0.48 MB per fold) |
+| `folds/<test subjects>/adapter_config.json`, `fold.json` | LoRA settings; train, validation and test subjects |
+| `run.json` | Base model and pinned revision, labels, all arguments, environment versions, git commit, results summary |
+| `preprocessing.json` | The preprocessing used (calibration statistics, window settings, excluded subjects) |
+| `metrics.csv`, `epochs.csv` | Accuracy and macro F1 per fold and phase; validation accuracy per epoch |
+| `confusion.png`, `train_log.txt`, `README.md` | Confusion matrix, full console log, readable summary |
+
+Folds are saved as they finish, so an interrupted run keeps its completed folds.
+
+The 150 MB base model is not committed (GitHub's limit is 100 MB per file). It is pinned to Hugging Face revision `411e288267f82cce86296dbe4d6c8bc533cc162f` and downloaded once on each laptop, so pinned base + committed adapter rebuilds exactly the same model everywhere.
+
+**On another laptop:**
+
+```bash
+git pull
+uv venv --python 3.11 .venv-finetune
+uv pip install --python .venv-finetune/bin/python -r requirements-finetune.txt
+.venv-finetune/bin/python -m src.models.moment_predict --adapter models/moment/<run>/folds/<fold> "Dataset/Healthy_person/S07/*.csv"
+```
+
+`moment_predict` applies the same preprocessing to the given recordings (all from one person, calibrated with that person's own level), writes per-window predictions to `results/moment_predictions.csv`, prints the most common prediction per file, and reports accuracy when a `movement_label` column exists. In Python: `load_finetuned(adapter_dir)` in `src/models/finetune_moment.py`.
+
+Verified before training: a model saved in this layout and reloaded gives identical outputs (maximum difference 0.0), and `moment_predict` reproduces the training calibration for S07 (mean 2.853).
 
 ## Commands
 
@@ -96,6 +126,7 @@ From `FYP/`:
 .venv-finetune/bin/python -m src.models.finetune_moment --smoke            # 3. one step per phase, saves nothing
 .venv-finetune/bin/python -m src.models.finetune_moment --split holdout    # 4. first real run
 .venv-finetune/bin/python -m src.models.finetune_moment --split loso       # 5. final comparison (8 folds)
+.venv-finetune/bin/python -m src.models.moment_predict --adapter models/moment/<run>/folds/<fold> <csv files>   # 6. use it
 ```
 
 Other options: `--size base`, `--probe-epochs`, `--lora-epochs`, `--lora-rank`, `--batch-size`, `--patience`, `--class-weights`, `--revin`, `--data`.
@@ -106,10 +137,11 @@ Other options: `--size base`, `--probe-epochs`, `--lora-epochs`, `--lora-rank`, 
 2494 healthy windows of 512 samples, 7 classes, 8 subjects, 1 fold(s); 301 synthetic-patient windows for extra testing
 linear probe: logits (32, 7), loss 1.938, trainable 3,591 of 35,340,999 parameters on mps
 LoRA: logits (32, 7), loss 1.941, trainable 118,279 of 35,459,278 parameters on mps
+save and reload: max logit difference 0.00e+00
 Smoke test passed: ready to fine-tune.
 ```
 
-The smoke test also saves the adapter to a temporary folder. It found and fixed one incompatibility: peft 0.13 reads the model config like a dictionary, and MOMENT's config has no `.get()`, so `add_lora()` adds one.
+The smoke test also saves the model in the run layout and reloads it. It found and fixed one incompatibility: peft 0.13 reads the model config like a dictionary, and MOMENT's config has no `.get()`, so `add_lora()` adds one.
 
 ## How the result is used
 

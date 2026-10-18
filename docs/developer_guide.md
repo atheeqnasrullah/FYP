@@ -22,7 +22,9 @@ How the code fits together, where to change things, and the rules that keep the 
 | `src/preprocessing/` | `clean()` filters, `make_windows()` |
 | `src/features/` | `extract()` 8 features; `build_dataset.py` |
 | `src/models/train_emg.py` | LDA/SVM/RF baselines: LOSO, within-subject, cross-cohort; metrics, confusion matrices, `results/splits.json` |
-| `src/models/finetune_moment.py` | MOMENT-1 fine-tuning: `--check-data`, `--smoke`, `--split holdout|loso` |
+| `src/models/finetune_moment.py` | MOMENT-1 fine-tuning: `--check-data`, `--smoke`, `--split holdout|loso`; `load_finetuned()` |
+| `src/models/moment_predict.py` | Run a saved fine-tuned model on one person's recordings |
+| `models/moment/` | Committed fine-tuning runs (adapters, metrics, logs); see its README |
 | `src/evaluation/` | `emg_activity_report.py`, `latency_report.py` |
 | `src/vision/hand_tracker.py` | MediaPipe wrapper, hand features, `rule_classify` |
 | `src/fusion/fusion_engine.py` | Confidence gate, majority smoothing, EMG attachment |
