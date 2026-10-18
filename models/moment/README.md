@@ -20,7 +20,7 @@ models/moment/
     ├── README.md                    results table and how to use it
     ├── run.json                     settings, base model + revision, labels, environment, git commit, summary
     ├── preprocessing.json           the data preprocessing used (copy of data/processed/moment/metadata.json)
-    ├── metrics.csv                  accuracy and macro F1 per fold and phase (+ synthetic patient)
+    ├── metrics.csv                  accuracy and macro F1 per fold and phase (+ stroke patient)
     ├── epochs.csv                   validation accuracy per epoch
     ├── confusion.png                confusion matrix over all test folds
     ├── train_log.txt                full console output

@@ -166,7 +166,7 @@ def main(argv=None):
         "excluded_subjects": excluded,
         "dropped_windows_by_subject": {k: v for k, v in dropped.items() if v},
         "calibration": stats, "class_weights_healthy": class_weights(healthy.label),
-        "note": "stroke_synthetic is generated data; train on cohort == healthy only",
+        "note": "stroke_patient is an extra test set only; train on cohort == healthy only",
     }
     (out / "metadata.json").write_text(json.dumps(meta, indent=2))
     print(f"Saved {len(manifest)} windows ({meta['padded_windows']} padded) from {segments} segments to {out}")

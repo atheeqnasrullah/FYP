@@ -4,7 +4,7 @@ Evaluations:
   loso            leave-one-subject-out: the honest cross-subject score
   within_subject  per trial, first 70% of windows train / last 30% test, with a
                   gap so overlapping windows never straddle the split
-  cross_cohort    train on healthy volunteers, test on the synthetic stroke patient
+  cross_cohort    train on healthy volunteers, test on the stroke patient
 """
 import argparse, json
 import joblib, numpy as np, pandas as pd
@@ -114,7 +114,7 @@ def main(argv=None):
             rows.append({"model": name, "evaluation": "within_subject", **score(y[test_mask], p), "n_test": int(test_mask.sum())})
         if not patients.empty:
             fitted = models()[name].fit(X, y); p = fitted.predict(patients[FEATURES])
-            rows.append({"model": name, "evaluation": "cross_cohort_stroke_synthetic", **score(patients.label, p), "n_test": len(patients)})
+            rows.append({"model": name, "evaluation": "cross_cohort_stroke_patient", **score(patients.label, p), "n_test": len(patients)})
     metrics = pd.DataFrame(rows); tables.mkdir(parents=True, exist_ok=True)
     metrics.to_csv(tables / f"{tag}_metrics.csv", index=False)
     print(metrics.pivot_table(index="model", columns="evaluation", values="accuracy").round(3))

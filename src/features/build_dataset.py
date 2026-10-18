@@ -6,8 +6,8 @@ from src.preprocessing.filters import clean
 from src.preprocessing.windowing import make_windows
 from src.features.emg_features import extract
 
-PUBLIC_SOURCES = {"healthy": ["healthy"], "stroke_synthetic": ["stroke_synthetic"],
-                  "public": ["healthy", "stroke_synthetic"]}
+PUBLIC_SOURCES = {"healthy": ["healthy"], "stroke_patient": ["stroke_patient"],
+                  "public": ["healthy", "stroke_patient"]}
 
 
 def recorded_frames():
@@ -59,7 +59,7 @@ def output_path(source):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Build windowed EMG feature tables")
     parser.add_argument("--source", choices=["recorded", *PUBLIC_SOURCES], default="recorded",
-                        help="recorded = data/raw/emg; others read Dataset/ (stroke_synthetic is generated data)")
+                        help="recorded = data/raw/emg; others read Dataset/ (stroke_patient is only an extra test set)")
     args = parser.parse_args(argv)
     out = build(args.source)
     if out.empty: raise SystemExit("No usable samples. Record EMG data first or choose a Dataset/ source.")

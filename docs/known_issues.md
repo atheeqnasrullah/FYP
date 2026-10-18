@@ -14,12 +14,13 @@ Checked against the code and data on 2026-10-18 (branch `main`). Issues are thin
 | 6 | Latency, webcam gesture accuracy and usability have not been measured | No evidence yet for the 300 ms and SUS > 68 targets | See [testing_and_evaluation.md](testing_and_evaluation.md) |
 | 7 | No front-end tests for RehabHub | Web regressions are found by hand | Add component tests (for example Vitest) |
 | 8 | `npm run lint` reports 4 `react-refresh/only-export-components` warnings | Only affects hot reload in development | Move shared helpers out of component files |
+| 9 | The patient file changed from the generated `SYN_STROKE_01` to `SP01` on 2026-10-18; its origin (real or generated) is not documented | Patient-test numbers in the docs and saved runs refer to `SYN_STROKE_01` | Confirm `SP01`'s origin; re-run `compare_models` and fine-tuning to update the patient results |
 
 ## Fixed on 2026-10-18
 
 | Issue | Fix |
 |---|---|
-| Code still read the deleted `Datasets/` folder (replay, feature builder, fine-tuning, web dataset explorer, 6 failing tests) | `src/data/public_datasets.py` now reads `Dataset/`; replay, `build_dataset --source healthy|stroke_synthetic|public`, `finetune_moment` and `backend/webapi.py` use it; all 41 tests pass |
+| Code still read the deleted `Datasets/` folder (replay, feature builder, fine-tuning, web dataset explorer, 6 failing tests) | `src/data/public_datasets.py` now reads `Dataset/`; replay, `build_dataset --source healthy|stroke_patient|public`, `finetune_moment` and `backend/webapi.py` use it; the dataset tests pass again |
 | Joined recordings in some files (time gaps, a backwards timestamp in `S01_Down.csv`) | The loader splits files into segments at gaps over 1 s or backwards steps; windows never cross a segment |
 | Window sizes assumed 1 kHz for dataset files | Dataset rows carry `fs` = 100, used by the feature builder, replay and fine-tuning |
 | Web Game Launcher had no EMG replay mode | "Webcam + EMG replay (no sensor)" added to every game |
@@ -29,7 +30,7 @@ Checked against the code and data on 2026-10-18 (branch `main`). Issues are thin
 
 - **Single EMG channel:** it separates activity levels (Rest, Hand_Open, Hand_Close) but not directions (Left/Right/Up/Down near chance), so EMG never controls the games.
 - **EMG is not strength:** RMS/MAV are envelope values in ADC units, not calibrated force.
-- **No real patients:** the only patient data is synthetic; no clinical claim can be made.
+- **No confirmed patient data:** one patient file (`SP01`, origin to be confirmed; it replaced a generated patient); no clinical claim can be made.
 - **No accounts or communication:** no login, no patient-therapist messaging, no reminders or report generation.
 - **Local only:** the API has no authentication; the Settings page can rewrite `config/settings.yaml` for anyone who can reach the API. Keep it on `127.0.0.1`.
 - **One game at a time** from the web app, on the same computer as the API.

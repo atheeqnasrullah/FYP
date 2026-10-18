@@ -11,8 +11,7 @@ Research only: games keep using camera labels. Runs in .venv-finetune
 
 Data: data/processed/moment/windows.npz from src.data.prepare_finetune:
 512-sample windows (5.12 s at 100 Hz) of log1p(ADC), z-scored per subject.
-Healthy volunteers train and test; the synthetic stroke patient is only an
-extra test set.
+Healthy volunteers train and test; the stroke patient is only an extra test set.
 
 MOMENT normally rescales every window to zero mean and unit spread (RevIN).
 That would erase the activity level that separates Rest, Hand_Open and
@@ -35,11 +34,13 @@ MODEL_IDS = {"small": "AutonLab/MOMENT-1-small", "base": "AutonLab/MOMENT-1-base
 # loads the same weights. The 150 MB base is downloaded once (MIT licence);
 # only the small fine-tuned adapters are committed to git.
 MODEL_REVISIONS = {"small": "411e288267f82cce86296dbe4d6c8bc533cc162f"}
+# Patient rows in metrics.csv: "(stroke patient)", or "(synthetic)" in runs made before 2026-10-18 15:00.
+PATIENT_TEST = "stroke patient|synthetic"
 RUNS_DIR = __import__("pathlib").Path(__import__("os").environ.get("MOMENT_RUNS_DIR", ROOT / "models/moment"))  # override for test runs
 
 
 def load_windows(path=DATA):
-    """Preprocessed windows split into the healthy training pool and the synthetic test set."""
+    """Preprocessed windows split into the healthy training pool and the stroke-patient test set."""
     path = __import__("pathlib").Path(path)
     if not path.exists(): raise SystemExit(f"{path} not found. Run python -m src.data.prepare_finetune first.")
     d = np.load(path, allow_pickle=False)
@@ -204,7 +205,7 @@ def main(argv=None):
     groups = data["subject"]
     test_sets = folds(args.split, set(groups))
     print(f"{len(data['y'])} healthy windows of {SEQ_LEN} samples, {len(labels)} classes, {len(set(groups))} subjects, "
-          f"{len(test_sets)} fold(s); {len(synthetic['y'])} synthetic-patient windows for extra testing")
+          f"{len(test_sets)} fold(s); {len(synthetic['y'])} stroke-patient windows for extra testing")
     if args.check_data:
         for test in test_sets:
             m = np.isin(groups, test); counts = np.bincount(data["y"][m], minlength=len(labels))
@@ -259,7 +260,8 @@ def main(argv=None):
         lora = predict(model, loader(data, test_mask, False), device); true = data["y"][test_mask]
         results = [("linear_probe", fold, true, probe), ("lora", fold, true, lora)]
         if len(synthetic["y"]):
-            results.append(("lora", "SYN_STROKE_01 (synthetic)", synthetic["y"], predict(model, loader(synthetic, every_synthetic, False), device)))
+            patient = "+".join(sorted(set(synthetic["subject"])))
+            results.append(("lora", f"{patient} (stroke patient)", synthetic["y"], predict(model, loader(synthetic, every_synthetic, False), device)))
         for phase, tested, y_true, pred in results:
             rows.append({"model": f"MOMENT-1-{args.size}", "phase": phase, "split": args.split, "fold": fold, "test": tested,
                          "accuracy": accuracy_score(y_true, pred), "macro_f1": f1_score(y_true, pred, average="macro"), "n_test": len(y_true),
@@ -273,7 +275,7 @@ def main(argv=None):
             "train": [s for s in train_subjects if s != val_subject], "labels": labels}, indent=2))
         pd.DataFrame(rows).to_csv(run_dir / "metrics.csv", index=False); pd.DataFrame(epochs).to_csv(run_dir / "epochs.csv", index=False)
     metrics = pd.DataFrame(rows)
-    summary = metrics.groupby(["phase", metrics.test.str.contains("synthetic").map({True: "synthetic", False: "healthy"})])[["accuracy", "macro_f1"]].mean().round(4)
+    summary = metrics.groupby(["phase", metrics.test.str.contains(PATIENT_TEST).map({True: "stroke patient", False: "healthy"})])[["accuracy", "macro_f1"]].mean().round(4)
     print(summary)
     from src.models.train_emg import save_confusion
     true, pred = np.concatenate(all_true), np.concatenate(all_pred)
@@ -346,12 +348,12 @@ def start_run(args, labels, test_sets, device):
 
 def finish_run(run_dir, metrics, summary):
     info = json.loads((run_dir / "run.json").read_text())
-    healthy = metrics[~metrics.test.str.contains("synthetic")]
+    healthy = metrics[~metrics.test.str.contains(PATIENT_TEST)]
     info["status"] = "completed"
     info["results"] = {phase: {"accuracy": round(float(g.accuracy.mean()), 4), "macro_f1": round(float(g.macro_f1.mean()), 4)}
                        for phase, g in healthy.groupby("phase")}
-    synthetic = metrics[metrics.test.str.contains("synthetic")]
-    if len(synthetic): info["results"]["lora_synthetic_patient"] = {"accuracy": round(float(synthetic.accuracy.mean()), 4)}
+    patient = metrics[metrics.test.str.contains(PATIENT_TEST)]
+    if len(patient): info["results"]["lora_stroke_patient"] = {"accuracy": round(float(patient.accuracy.mean()), 4)}
     (run_dir / "run.json").write_text(json.dumps(info, indent=2))
     lines = [f"# MOMENT-1 fine-tuning run `{info['run_id']}`", "",
              f"Base model: [{info['base_model']}](https://huggingface.co/{info['base_model']}) at revision `{info['base_revision']}`, "

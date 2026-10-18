@@ -8,7 +8,7 @@ How the code fits together, where to change things, and the rules that keep the 
 2. **One label vocabulary at runtime:** `config/labels.yaml`, read by `runtime_labels()` in `src/utils/config.py`. The keyboard map, simulator and games use these labels. Supination/Pronation exist only as keyboard keys for Treasure Hunt's lock.
 3. **Signal type and sample rate matter.** `envelope` skips the bandpass/notch; `raw` gets 20-450 Hz bandpass and 50 Hz notch. `fs` converts window milliseconds to samples, so it must match the data (1000 for the live ESP32, 100 for `Dataset/`).
 4. **Split by subject.** Evaluate EMG models leave-one-subject-out or on held-out subjects, never by random window: windows overlap by 50%.
-5. **Synthetic data stays labelled.** The synthetic stroke patient is never presented as clinical evidence.
+5. **Patient data stays separate.** The stroke patient (`cohort == "stroke_patient"`) is only an extra test set, never trained on, and never presented as clinical evidence.
 6. **Local only.** No authentication exists; never bind the API to a public interface.
 
 ## Module map

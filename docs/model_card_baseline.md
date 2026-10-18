@@ -16,7 +16,7 @@
 |---|---|---|
 | Leave-one-subject-out | 36.7% | 0.321 |
 | Within-subject (first 70% of each recording train, last 30% test, 2-window gap) | 37.5% | 0.331 |
-| Train healthy, test synthetic stroke patient | 25.4% | 0.201 |
+| Train healthy, test synthetic stroke patient `SYN_STROKE_01` (earlier file, now replaced by `SP01`) | 25.4% | 0.201 |
 
 Recall across subjects: Rest 81%, Hand_Close 65%, Hand_Open 46%, Left 21%, Down 18%, Up 15%, Right 7%.
 
@@ -25,7 +25,7 @@ Recall across subjects: Rest 81%, Hand_Close 65%, Hand_Open 46%, Left 21%, Down 
 - Single channel: it separates activity levels (Rest, Hand_Open, Hand_Close) but not directions, which are near chance.
 - Hand_Open is confused with Rest 43% of the time; both are low-activity.
 - S01 lacks Rest and S04 lacks Down, so their folds miss a class; S01's recordings contain about 2,400 dropped-sample gaps.
-- The synthetic patient is generated data; transfer results say nothing about real patients.
+- The patient result used generated data; it says nothing about real patients.
 
 ## Reproduce
 

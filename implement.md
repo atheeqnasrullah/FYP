@@ -1,5 +1,7 @@
 # implement.md
 
+> **Outdated (kept for reference).** This document describes an earlier plan. The current, checked documentation is in [docs/README.md](docs/README.md); [docs/corrections.md](docs/corrections.md) lists where this file differs from the built system.
+
 # Implementation Guide: Gamified Upper-Limb Stroke Rehabilitation System
 
 Current runtime roles: computer vision labels hand gestures and movement direction; the MD0437/ESP32 stream supplies timestamped EMG activity features (RMS, MAV, etc.). Game commands are camera-derived, and combined mode attaches EMG activity for feedback/logging. The legacy EMG classification snippets in this scaffold are optional offline experiments only; their model does not control the games. For the implemented workflow see `architecture.md`, `README.md`, and `python -m src.acquisition.fused_logger`.

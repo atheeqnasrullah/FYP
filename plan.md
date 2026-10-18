@@ -1,5 +1,7 @@
 # plan.md
 
+> **Outdated (kept for reference).** This document describes an earlier plan. The current, checked documentation is in [docs/README.md](docs/README.md); [docs/corrections.md](docs/corrections.md) lists where this file differs from the built system.
+
 # Project Plan: Gamified Upper-Limb Stroke Rehabilitation System
 
 Companion documents: `architecture.md` (design) and `implement.md` (build steps).

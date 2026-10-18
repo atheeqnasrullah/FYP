@@ -23,3 +23,5 @@ results/tables/*
 data/processed/moment/
 Dataset/public/
 data/processed/public/
+.DS_Store
+.pytest_cache/

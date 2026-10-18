@@ -11,7 +11,7 @@ Run on 2026-10-18 with `src/evaluation/compare_models.py`. Every fine-tuned mode
 | Item | Value |
 |---|---|
 | Data | `Dataset/Healthy_person`, 8 volunteers (S02-S09; S01 excluded for 39% lost samples), 7 movements: Rest, Hand_Open, Hand_Close, Left, Right, Up, Down |
-| Extra test | Synthetic stroke patient `SYN_STROKE_01` (generated data, never trained on) |
+| Extra test | Stroke patient: the generated patient `SYN_STROKE_01` at the time of these runs (now replaced by `SP01`, see [datasets.md](datasets.md)); never trained on |
 | Leave-one-subject-out (LOSO) | 8 folds; each tests one volunteer. Train on 6, the 7th is MOMENT's early-stopping subject (classical models skip it) |
 | Holdout | Train S02-S05, validation S06 (MOMENT only), test S07+S08+S09 (903 windows, 129 per movement) |
 | Splits | Read from the saved runs (`models/moment/*/folds/*/fold.json`), so every method sees exactly the same people |
@@ -62,6 +62,8 @@ Run on 2026-10-18 with `src/evaluation/compare_models.py`. Every fine-tuned mode
 The holdout has only three test volunteers, so LOSO (all 8) is the more reliable ranking.
 
 ## Results: synthetic stroke patient
+
+Patient results in this table were computed on the earlier generated patient `SYN_STROKE_01`, which was replaced by `SP01` on 2026-10-18; re-run the evaluation to update them. Healthy-volunteer results are unaffected.
 
 Trained on healthy volunteers only; LOSO values are the mean of the 8 fold models.
 
@@ -144,7 +146,7 @@ Fine-tuned MOMENT per volunteer (LOSO accuracy):
 | S07 | 43.5% | 43.9% | 44.2% | 42.5% |
 | S08 | 50.8% | 47.8% | 51.2% | 48.8% |
 | S09 | 44.5% | 42.9% | 44.5% | 43.5% |
-| Synthetic patient (mean of 8 models) | 43.4% | 42.4% | 42.2% | 42.8% |
+| Synthetic patient `SYN_STROKE_01` (mean of 8 models) | 43.4% | 42.4% | 42.2% | 42.8% |
 
 Why the public data helped so little:
 

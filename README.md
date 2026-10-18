@@ -1,59 +1,75 @@
-# Stroke Rehabilitation Prototype
+# Gamified Upper-Limb Stroke Rehabilitation System
 
-A local research prototype for EMG and webcam driven upper limb rehabilitation games with session monitoring. It is not a certified medical device. Use coded participant IDs and obtain ethics approval and informed consent before collecting data. Do not attach mains powered equipment to a person.
+A Final Year Project (Sri Lanka Technology Campus) research prototype: a webcam turns hand movements into controls for four rehabilitation games, a single-channel EMG sensor (MD0437 + ESP32) measures forearm muscle activity, and every session is stored by a local API and shown to the physiotherapist in a web app (RehabHub).
+
+> **Not a certified medical device.** Use coded participant IDs, obtain ethics approval and informed consent before recording anyone, and never attach mains-powered equipment to a person.
+
+**Full documentation: [docs/README.md](docs/README.md)**: overview and implementation status, architecture, user and developer guides, API, datasets, model comparison, fine-tuning, known issues and corrections to older documents.
 
 ## Quick start
 
-Python 3.10–3.11 is required (3.11 recommended). Create a virtual environment, install `requirements.txt` (and `requirements-dev.txt` for tests), then run `python main.py keyboard`. Without the ESP32, `python main.py live --emg-source replay` uses a recorded healthy-volunteer EMG signal so Webcam + EMG mode still works. Full setup: [docs/user_guide.md](docs/user_guide.md). Use arrow keys, O/C, S/P and Space. Choose a game with `--game balloon|car|treasure|shape`. Run the API with `uvicorn backend.app:app --reload` and the dashboard with `streamlit run dashboard/dashboard.py`.
+Requirements: Python 3.11, Node.js 18+, a webcam (optional: ESP32 + MD0437).
 
-`python main.py sim` feeds simulated commands; `python main.py vision` uses the webcam without EMG; `python main.py live` combines the webcam with the configured serial device. The webcam supplies movement labels to the games. The MD0437 signal supplies EMG activity features such as RMS and MAV; an EMG gesture model is not needed for game control. In combined mode, the fusion command carries the camera movement label and the current EMG activity measurements. Webcam video is rendered behind the game objects. Hardware capture and feature analysis are described below. Configuration is in `config/settings.yaml`.
+```bash
+# 1. Install
+uv venv --python 3.11 .venv && source .venv/bin/activate        # or: py -3.11 -m venv .venv
+uv pip install -r requirements.txt -r requirements-dev.txt       # or: pip install ...
+cd webapp && npm install && npm run build && cd ..
 
-The webcam path supports both legacy MediaPipe Solutions and the current Tasks API. On the Tasks API it downloads Google's hand landmarker model to `data/models/` on first run if the model is not already present. Keep `opencv-contrib-python` at the pinned 4.11 version in `requirements.txt`; OpenCV 5 builds tested here could not open camera indices.
+# 2. Run the API (it also serves the web app)
+python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
+# open http://127.0.0.1:8000/ui  -> add a patient -> Game Launcher
 
-Camera gesture detection combines finger-joint angles with palm-normalized fingertip reach, stabilizes labels across frames, and recognizes Left/Right/Up/Down from palm movement over time. The game pointer follows the middle section of the middle finger. Tune `lr_motion_threshold`, `ud_motion_threshold`, `lr_motion_hold_ms`, `lr_motion_cooldown_ms`, `vision_smoothing_frames`, and `pointer_smoothing_alpha` in `config/settings.yaml`. Camera gestures control all games in Webcam Only and Webcam + EMG modes. Combined mode also shows and records EMG activity features; runtime does not use an EMG classifier to decide movement labels.
+# 3. Or start a game directly
+python main.py keyboard --game balloon          # no hardware
+python main.py vision --game car                # webcam
+python main.py live --game shape                # webcam + EMG sensor
+python main.py live --emg-source replay --game treasure   # webcam + recorded EMG
+```
 
-**Balloon Pop**: move your hand to aim and make a full fist to pop a balloon. The cursor is a hand icon that shows open hand or fist; the balloon within reach glows and a label says "Make a fist!", and after a pop it asks you to open your hand again. Golden balloons give a bonus. On easier levels hand movement is amplified so the screen edges need less reach.
+If port 8000 is taken, use another port and set `backend_url` in `config/settings.yaml` to match. Details: [docs/user_guide.md](docs/user_guide.md).
 
-**Car Driving** offers Webcam Only and Webcam + EMG Sensor modes. In webcam modes the car follows the hand's *position*: hold your hand on the left, middle or right of the camera view to drive in that lane (the zones sit closer together on easier levels, so less arm movement is needed), and make a fist to brake. A steering bar at the bottom shows where the hand is and which lane to aim for. Drive into the green lane to catch the gold star while avoiding traffic. In keyboard mode the arrow keys move one lane and C brakes. The combined mode also shows live EMG RMS/MAV features and a relative activity meter; these are electrical signal activity indicators, not clinical muscle-strength scores.
+## What is in the system
 
-The dashboard has a launcher for four games. Select a game and patient code, then click **Start selected game**. The Pygame window opens on the computer running Streamlit; it does not render inside the browser. In webcam modes, the camera video appears as the background inside the game window, behind the game objects. Progress includes score/accuracy and available average EMG RMS/MAV by detected movement. Press Esc to finish and save the session, or use **Stop running game** in the dashboard.
+| Part | Summary | Docs |
+|---|---|---|
+| Games | Balloon Pop, Car Driving, Treasure Hunt, Shape Matching; start screen, timer, rewards, adaptive difficulty (levels 1-5, remembered per patient) | [games.md](docs/games.md) |
+| Vision | MediaPipe hand landmarks: Rest, Hand_Open, Hand_Close, Left, Right, Up, Down; the camera decides every game action | [signal_processing_and_vision.md](docs/signal_processing_and_vision.md) |
+| EMG | MD0437 envelope at 1 kHz over USB serial; RMS/MAV activity shown and logged (not strength) | [hardware.md](docs/hardware.md) |
+| Web app (RehabHub) | Dashboard, patients, sessions, game launcher, EMG dataset explorer, settings | [web_app.md](docs/web_app.md) |
+| API | FastAPI + SQLite, 32 endpoints, local only (no authentication) | [api_reference.md](docs/api_reference.md) |
+| Data | `Dataset/`: 9 healthy volunteers and 1 stroke patient, 7 movements, 100 Hz | [datasets.md](docs/datasets.md) |
+| EMG classifiers (offline research) | LDA, SVM, random forest and MOMENT-1 (fine-tuned models in `models/moment/`) | [model_comparison.md](docs/model_comparison.md) |
 
-**Hand Gesture Shape Matching** is a wooden shape sorter: move the hand cursor over a shape on the shelf, make a fist to pick it up, carry it to the hole with the same shape and open your hand to drop it. The shape under the cursor glows, the carried shape's hole pulses (with a guide line and shape names on easier levels), and a label tells you when to grab or release. Dropping on the wrong hole counts as a mistake and the shape floats back to the shelf; dropping away from any hole does not. Webcam + EMG also displays RMS/MAV activity measurements. If the camera is off, use the mouse or Space key.
+## Key results (offline, 8 healthy volunteers, 7 movements, chance 14.3%)
 
-**Treasure Hunt** is an island grid. In webcam modes your hand works like a joystick: push it left, right, up or down from the centre to walk one square, then bring it back to the centre for the next step (so returning the hand never walks the explorer backwards). A yellow arrow and a footprint trail lead to the nearest chest; on a chest, open your hand to unlock it and make a fist to grab the gold. A panel beside the island shows the camera picture with the joystick zones, the arrow to follow and your hand position, or the gesture to make at a chest. Keyboard mode uses the arrow keys, O and C.
+| Method | Leave-one-subject-out accuracy |
+|---|---|
+| Frozen MOMENT-1 features + random forest | **48.1%** |
+| SVM on 5.12 s window features | 47.3% |
+| MOMENT-1-small fine-tuned (LoRA) | 43.2% (44.4% when pre-trained on public UCI data) |
+| SVM on 200 ms window features | 37.2% |
 
-### Game sessions
+Rest, Hand_Open and Hand_Close are recognised well from EMG; Left, Right, Up and Down are near chance with one forearm channel, so the camera keeps control of movement. Public data (UCI) gave no reliable gain. See [docs/model_comparison.md](docs/model_comparison.md).
 
-Every game opens with a how-to-play screen (start with Space, or by holding an open hand), counts down 3-2-1, and runs for a set time with a timer at the top. The prompt at the top always names the movement to make next. Press Enter to pause, M to mute sound, Esc to finish early. At the end a results screen shows score, accuracy, good movements per movement type, best streak, average reaction time and the patient's previous best, and the session is saved.
+## Repository map
 
-Difficulty is `auto` by default: after several successes in a row the game speeds up (faster balloons, faster traffic, more chests and obstacles, more shapes and a tighter drop zone) and after misses it slows down. The level is remembered per patient and game in `data/logs/game_levels.json`, so the next session starts where the last one ended. Choose a fixed level or session length in the web app's Game Launcher, with `python main.py vision --game car --difficulty easy --duration 120`, or with `game_difficulty`, `game_session_seconds`, `game_sound` and `game_show_screens` in `config/settings.yaml`.
+```text
+main.py            game entry point              backend/    FastAPI (app.py, webapi.py)
+src/               acquisition, preprocessing,   webapp/     RehabHub (React + TypeScript)
+                   features, data, models,       dashboard/  Streamlit dashboard (older)
+                   evaluation, vision, fusion,   firmware/   ESP32 sketch
+                   realtime, games, utils        config/     settings.yaml, labels.yaml
+Dataset/           EMG recordings                models/     fine-tuned MOMENT-1 runs
+docs/              documentation                 tests/      47 pytest tests
+```
 
-## Web application (React + TypeScript)
+`python -m pytest -q` runs the tests. Fine-tuning uses a separate environment (`.venv-finetune`, see [docs/fine_tuning_moment.md](docs/fine_tuning_moment.md)).
 
-`webapp/` is an all-in-one web app that manages the whole system from the browser: a dashboard with overall statistics, patient records (add/edit/delete, progress charts, CSV export), every recorded session with per-attempt drill-down, a game launcher (choose game, input mode and patient; start/stop and view the live log), an EMG dataset explorer (signal plots, RMS/MAV/VAR/peak/WL features, healthy vs patient group comparison) and an editor for `config/settings.yaml`. It also imports sessions that games saved offline to `data/logs/pending_sessions.jsonl`.
+## Older documents
 
-Node.js 18+ is required. For development, start the API (`uvicorn backend.app:app --reload`) and in another terminal run `cd webapp && npm install && npm run dev`, then open http://localhost:5173 (requests to `/api` are proxied to port 8000). To serve it from the API instead, run `npm run build` once; FastAPI then serves the built app at http://127.0.0.1:8000/ui. As with the API, there is no authentication: keep it on the local machine.
+`Stroke_Rehab_System_Documentation.pdf`, `EMG_Project_Documentation.md` (original concept), `architecture.md`, `implement.md` and `plan.md` describe earlier plans. Where they differ from `docs/`, `docs/` is correct; [docs/corrections.md](docs/corrections.md) lists every difference.
 
-## Data and model workflow
+## Credits
 
-To collect **EMG only, without a webcam**, run `python -m src.acquisition.emg_logger S01 3 --labels Rest Hand_Open Hand_Close Left Right Up Down --separate-files --ordered`. The terminal prompts you before each 4-second trial; perform the named movement, and the logger records raw sensor samples with the label you selected. This creates one file per label, such as `data/raw/emg/S01_session3_Rest.csv`. It refuses to overwrite these files, so choose a new session number for another recording. Close Arduino Serial Monitor first and configure the ESP32 COM port and 921600 baud in `config/settings.yaml`.
-
-To collect synchronized EMG and camera-derived movement labels instead, run `python -m src.acquisition.fused_logger S01 1 --seconds 120`. This saves timestamped sensor samples and the current webcam label to `data/raw/emg/`; the preview video is not saved. Build per-window RMS, MAV and other EMG features with `python -m src.features.build_dataset`. `python -m src.models.train_emg` is available for offline experiments comparing EMG features with camera labels; its model is not used to control the games. Keep raw data and model artifacts out of version control.
-
-The single-channel MD0437 is used to measure electrical signal activity, while computer vision identifies the performed movement. RMS, MAV and related values are activity indicators, not clinical muscle-strength measurements. Combined mode requires a connected serial sensor for EMG measurements, while camera-based game control works without a trained model.
-
-For the MD0437 sensor, `SIG` is a filtered and rectified muscle-activity envelope, not raw EMG. `config/settings.yaml` sets `signal_type: envelope`; offline feature building and live monitoring preserve this envelope and skip raw-EMG bandpass/notch filters. The webcam supplies labels such as Hand_Open, Hand_Close, Left, Right, Up and Down. Check the exact board's power requirements and keep SIG within the ESP32 ADC input range before wiring.
-
-## Datasets, results and tests
-
-`Datasets/` holds 11 healthy volunteers (raw and filtered) and 3 **synthetic** simulated patients, 7 gestures each. Build features with `python -m src.features.build_dataset --source public`, train the offline baselines with `python -m src.models.train_emg --features data/features/emg_features_public.csv`, and write activity/data-quality reports with `python -m src.evaluation.emg_activity_report`. The best single-channel baseline reaches 28.8% leave-one-subject-out accuracy on 7 gestures (chance 14.3%), which supports camera-driven control. Run `python -m pytest -q` for the 28 automated tests. Details: [docs/datasets.md](docs/datasets.md), [docs/testing_and_evaluation.md](docs/testing_and_evaluation.md), [docs/model_card_baseline.md](docs/model_card_baseline.md).
-
-Stage 7 (MOMENT-1 fine-tuning) is prepared but waits for approval: [docs/fine_tuning_moment.md](docs/fine_tuning_moment.md).
-
-## API
-
-FastAPI docs are at `/docs`; reference: [docs/api_reference.md](docs/api_reference.md). Sessions saved while the API is down are queued in `data/logs/pending_sessions.jsonl` and uploaded on the next save or from the dashboard sidebar. Endpoints support patients, sessions, attempts, history, progress, and CSV exports. Local SQLite is stored in `data/rehab.db`. There is no authentication in this local prototype; do not expose it to a network or store identifying health data.
-
-## Project map
-
-`src/` signal processing, acquisition, datasets, ML, evaluation, vision, fusion, games and runtime; `tests/` pytest suite; `backend/` local API; `webapp/` React + TypeScript web app; `dashboard/` clinician dashboard; `firmware/` ESP32 sketch; `config/` settings; `docs/` user and developer guides, datasets, API, evaluation, model card, fine-tuning plan, protocols and ethics templates. Developer notes: [docs/developer_guide.md](docs/developer_guide.md).
+Public data: UCI "EMG Data for Gestures" (Lobov et al., *Sensors* 2018), CC BY 4.0. Base model: [AutonLab/MOMENT-1-small](https://huggingface.co/AutonLab/MOMENT-1-small), MIT licence. Team: M.N.M. Atheeq, A.F.M. Imzaan; supervisors Ms. Dulashi Pabasara and Mr. Vihanga Herath.

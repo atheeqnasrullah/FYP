@@ -22,7 +22,7 @@ from sklearn.metrics import accuracy_score, f1_score, recall_score
 from src.utils.config import ROOT
 from src.features.emg_features import FEATURES, extract
 from src.models.train_emg import models as classical_models
-from src.models.finetune_moment import DATA, load_windows, load_public, build_model
+from src.models.finetune_moment import DATA, PATIENT_TEST, load_windows, load_public, build_model
 from src.evaluation.compare_models import read_folds, embeddings
 
 LENGTH_FEATURES = {"WL", "ZC", "SSC"}  # sums or counts that grow with window length
@@ -64,7 +64,7 @@ def finetuned_rows(run_dirs, rows):
         public = bool(args.get("extra_data") or args.get("pretrain_data"))
         how = " + ".join(x for x, on in (("pre-trained on public", args.get("pretrain_data")), ("public windows added", args.get("extra_data"))) if on) or "own data only"
         metrics = pd.read_csv(run_dir / "metrics.csv")
-        for r in metrics[(metrics.phase == "lora") & ~metrics.test.str.contains("synthetic")].itertuples():
+        for r in metrics[(metrics.phase == "lora") & ~metrics.test.str.contains(PATIENT_TEST)].itertuples():
             rows.append({"method": "MOMENT LoRA fine-tuned", "public_data": public, "variant": how, "run": info["run_id"],
                          "fold": r.fold, "accuracy": r.accuracy, "macro_f1": r.macro_f1})
 

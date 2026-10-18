@@ -29,7 +29,7 @@ from sklearn.metrics import accuracy_score, f1_score, recall_score
 from src.utils.config import ROOT
 from src.features.emg_features import FEATURES, extract
 from src.models.train_emg import models as classical_models
-from src.models.finetune_moment import DATA, load_windows, build_model, load_finetuned
+from src.models.finetune_moment import DATA, PATIENT_TEST, load_windows, build_model, load_finetuned
 
 
 def read_folds(run_dir):
@@ -40,7 +40,7 @@ def score(evaluation, method, family, stage, fold, test, y_true, y_pred, labels,
     rows.append({"evaluation": evaluation, "method": method, "family": family, "stage": stage, "fold": fold, "test": test,
                  "accuracy": accuracy_score(y_true, y_pred), "macro_f1": f1_score(y_true, y_pred, average="macro", labels=range(len(labels)), zero_division=0),
                  "n": len(y_true)})
-    if test != "synthetic":
+    if test != "patient":
         recalls.append({"evaluation": evaluation, "method": method, "fold": fold, "y_true": np.asarray(y_true), "y_pred": np.asarray(y_pred)})
 
 
@@ -53,7 +53,7 @@ def classical_on(features_by, folds, synthetic_features, evaluation, family, lab
             started = time.time(); model.fit(X[train], y[train])
             method = f"{name} ({note})"
             score(evaluation, method, family, "classical", "+".join(f["test"]), "healthy", y[test], model.predict(X[test]), labels, rows, recalls)
-            score(evaluation, method, family, "classical", "+".join(f["test"]), "synthetic", synthetic_features[1], model.predict(synthetic_features[0]), labels, rows, recalls)
+            score(evaluation, method, family, "classical", "+".join(f["test"]), "patient", synthetic_features[1], model.predict(synthetic_features[0]), labels, rows, recalls)
             print(f"  {evaluation} {method} test {'+'.join(f['test'])}: {rows[-2]['accuracy']:.3f} ({time.time() - started:.0f} s)", flush=True)
 
 
@@ -114,7 +114,7 @@ def main(argv=None):
 
     if not args.skip_200ms:
         feats = pd.read_csv(args.features)
-        healthy, syn = feats[feats.cohort == "healthy"], feats[feats.cohort == "stroke_synthetic"]
+        healthy, syn = feats[feats.cohort == "healthy"], feats[feats.cohort == "stroke_patient"]
         to_idx = lambda s: s.map(labels.index).to_numpy()
         h = (healthy[FEATURES].to_numpy(), to_idx(healthy.label), healthy.subject_id.astype(str).to_numpy())
         s = (syn[FEATURES].to_numpy(), to_idx(syn.label))
@@ -149,9 +149,9 @@ def main(argv=None):
             test = np.isin(data["subject"], f["test"]); fold = "+".join(f["test"])
             score(evaluation, "MOMENT LoRA (fine-tuned)", "MOMENT after fine-tuning", "after", fold, "healthy",
                   data["y"][test], logits_predict(model, data["X"][test], data["mask"][test], device), labels, rows, recalls)
-            score(evaluation, "MOMENT LoRA (fine-tuned)", "MOMENT after fine-tuning", "after", fold, "synthetic",
+            score(evaluation, "MOMENT LoRA (fine-tuned)", "MOMENT after fine-tuning", "after", fold, "patient",
                   synthetic["y"], logits_predict(model, synthetic["X"], synthetic["mask"], device), labels, rows, recalls)
-            saved = metrics[(metrics.phase == "lora") & (metrics.fold == fold) & ~metrics.test.str.contains("synthetic")].accuracy.iloc[0]
+            saved = metrics[(metrics.phase == "lora") & (metrics.fold == fold) & ~metrics.test.str.contains(PATIENT_TEST)].accuracy.iloc[0]
             print(f"  {evaluation} reloaded LoRA {fold}: {rows[-2]['accuracy']:.3f} (training run reported {saved:.3f})", flush=True)
 
     table = pd.DataFrame(rows)

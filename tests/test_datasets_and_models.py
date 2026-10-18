@@ -8,7 +8,7 @@ from src.models.train_emg import subject_normalise, within_subject_split
 from src.utils.config import runtime_labels
 
 
-@pytest.mark.parametrize("source,subjects", [("healthy", 9), ("stroke_synthetic", 1)])
+@pytest.mark.parametrize("source,subjects", [("healthy", 9), ("stroke_patient", 1)])
 def test_sources_load_all_gestures(source, subjects):
     data = load_source(source)
     assert data.subject_id.nunique() == subjects
@@ -21,9 +21,10 @@ def test_gestures_match_runtime_labels():
     assert sorted(GESTURES) == sorted(runtime_labels())
 
 
-def test_synthetic_patient_is_kept_separate():
-    data = load_source("stroke_synthetic")
-    assert set(data.cohort) == {"stroke_synthetic"} and set(data.subject_id) == {"SYN_STROKE_01"}
+def test_stroke_patient_is_kept_separate():
+    data = load_source("stroke_patient")
+    assert set(data.cohort) == {"stroke_patient"} and data.subject_id.nunique() == 1
+    assert not set(data.subject_id) & set(load_source("healthy").subject_id)
 
 
 def test_segments_split_at_long_gaps_and_backward_steps():
@@ -32,7 +33,7 @@ def test_segments_split_at_long_gaps_and_backward_steps():
 
 
 def test_build_public_features_uses_dataset_rate():
-    features = build("stroke_synthetic")
+    features = build("stroke_patient")
     assert not features.empty and set(FEATURES) <= set(features.columns)
     assert features.groupby("trial_id").window_id.min().eq(0).all()
     # 60 s at 100 Hz with 200 ms windows every 100 ms -> 599 windows per movement

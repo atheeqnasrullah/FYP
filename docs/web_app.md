@@ -14,7 +14,7 @@ RehabHub is the physiotherapist's single place to manage patients, launch games,
 | EMG Datasets | Browse CSV files, plot the signal, compute RMS, MAV, VAR, peak and waveform length, and compare healthy with patient data per movement |
 | Settings | Light or dark theme, API address override, hardware summary, and an editor for `config/settings.yaml` that validates the YAML before saving |
 
-The EMG Datasets page lists `Dataset/` (healthy volunteers and the synthetic patient) and your own recordings in `data/raw/emg/`.
+The EMG Datasets page lists `Dataset/` (healthy volunteers and the stroke patient) and your own recordings in `data/raw/emg/`.
 
 ## Running it
 

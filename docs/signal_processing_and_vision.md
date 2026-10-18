@@ -22,7 +22,7 @@ EMG is cut into 200 ms windows every 100 ms and each window yields eight activit
 
 These describe electrical activity, not muscle strength.
 
-**Offline feature tables:** `python -m src.features.build_dataset` reads your recordings in `data/raw/emg/` (using `fs` from the settings) and writes `data/features/emg_features.csv`. `--source healthy|stroke_synthetic|public` reads `Dataset/` at its own 100 Hz and writes `data/features/emg_features_<source>.csv` (41,066 windows for `public`).
+**Offline feature tables:** `python -m src.features.build_dataset` reads your recordings in `data/raw/emg/` (using `fs` from the settings) and writes `data/features/emg_features.csv`. `--source healthy|stroke_patient|public` reads `Dataset/` at its own 100 Hz and writes `data/features/emg_features_<source>.csv` (41,066 windows for `public`).
 
 ## Vision
 

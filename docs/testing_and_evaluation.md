@@ -13,7 +13,7 @@
 | `test_dashboard.py` | 1 | Streamlit dashboard runs without an API |
 | `test_game_logic.py` | 4 | Difficulty presets, auto level up and down, level remembered per patient, results summary |
 | `test_games_headless.py` | 12 | All four games with scripted input on a hidden display: scoring, time limit, hand-position lanes, hand joystick, pick and drop by hand, latency logging |
-| `test_datasets_and_models.py` | 9 | `Dataset/` loading (both groups), labels match the games, synthetic patient kept separate, segment splitting, 100 Hz feature windows, split gap, normalisation |
+| `test_datasets_and_models.py` | 9 | `Dataset/` loading (both groups), labels match the games, stroke patient kept separate, segment splitting, 100 Hz feature windows, split gap, normalisation |
 | `test_emg_replay.py` | 1 | Replay of `Dataset/` feeds the live pipeline |
 | `test_prepare_finetune.py` | 3 | Fine-tuning preprocessing: 10 ms resampling, padding and masking, saved windows, S01 exclusion |
 | `test_public_emg.py` | 3 | Public-data envelope conversion, shared labels, safe archive extraction |
@@ -38,7 +38,7 @@ Outputs: `results/tables/baseline_public_metrics.csv`, `data_quality.csv`, `emg_
 
 Healthy volunteers in `Dataset/` (9 subjects, 7 movements, chance 14.3%), 36,873 windows of 200 ms (20 samples at 100 Hz), 8 features per window. Run on 2026-10-18.
 
-| Model | Leave-one-subject-out | Within-subject (70/30 in time) | Train healthy, test synthetic patient |
+| Model | Leave-one-subject-out | Within-subject (70/30 in time) | Train healthy, test synthetic patient `SYN_STROKE_01` (earlier file) |
 |---|---|---|---|
 | LDA | 33.3% | 34.9% | 26.4% |
 | SVM (RBF, C=10) | **36.7%** | **37.5%** | 25.4% |
@@ -74,15 +74,15 @@ On the same 8 volunteers, fine-tuned MOMENT-1-small reaches 43.2% leave-one-subj
 
 Mean window RMS in ADC units (`emg_activity_by_gesture.csv`):
 
-| Movement | Healthy (9) | Synthetic stroke patient |
+| Movement | Healthy (9) | Stroke patient `SP01` |
 |---|---|---|
-| Hand_Close | 884.6 | 466.3 |
-| Up | 413.8 | 384.9 |
-| Down | 413.5 | 174.9 |
-| Right | 387.9 | 291.7 |
-| Left | 301.4 | 145.1 |
-| Hand_Open | 92.0 | 83.5 |
-| Rest | 38.5 | 41.5 |
+| Hand_Close | 884.6 | 81.8 |
+| Up | 413.8 | 44.2 |
+| Down | 413.5 | 60.7 |
+| Right | 387.9 | 41.3 |
+| Left | 301.4 | 32.0 |
+| Hand_Open | 92.0 | 26.6 |
+| Rest | 38.5 | 18.1 |
 
 Relative to each volunteer's own Rest (`emg_rms_relative_to_rest.csv`), Hand_Close ranges from 7.3x (S03) to 117x (S02). S03's Hand_Open (0.41x) and Up (0.82x) fall below its Rest; every other subject-movement pair is above Rest. S01 has no Rest file and S04 no Down file. These are activity values, not strength.
 

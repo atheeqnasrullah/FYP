@@ -22,7 +22,7 @@ The PDF combines an early `architecture.md`, `plan.md` and `implement.md`.
 | Repository has `river_crossing.py`, `train_vision.py`, `evaluate.py`, `vision_features.py`, `logger.py`, `helpers.py`, `database.py`, `routes/` | None of these exist ([architecture.md](architecture.md), section 6) |
 | Clinician dashboard in Streamlit | RehabHub web app (React + TypeScript); Streamlit remains as an older view |
 | Per-user calibration step | Not implemented; adaptive difficulty from accuracy instead |
-| Data plan: 5-10 subjects x 9 movements x 15 reps | `Dataset/`: 9 volunteers x 7 movements, 60 s each, plus one synthetic patient |
+| Data plan: 5-10 subjects x 9 movements x 15 reps | `Dataset/`: 9 volunteers x 7 movements, 60 s each, plus one stroke patient (`SP01`) |
 | Latency = game time - EMG sample time | Latency = game time - camera frame capture time |
 
 ## `EMG_Project_Documentation.md` (concept notes)
@@ -65,7 +65,7 @@ The PDF combines an early `architecture.md`, `plan.md` and `implement.md`.
 
 | What they say | What is true now |
 |---|---|
-| `Datasets/` holds 11 volunteers and 3 synthetic patients | `Dataset/` holds 9 volunteers and 1 synthetic patient |
+| `Datasets/` holds 11 volunteers and 3 synthetic patients | `Dataset/` holds 9 volunteers and 1 stroke patient (`SP01`) |
 | 28 automated tests | 47 tests, all passing |
 | `--emg-source replay` plays a recorded healthy volunteer | It now replays `Dataset/` (default S02) at 100 Hz |
 | Best baseline 28.8% leave-one-subject-out | That came from the deleted data; on `Dataset/` the best is 36.7% (SVM) |

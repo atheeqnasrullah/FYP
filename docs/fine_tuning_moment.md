@@ -43,9 +43,9 @@
 |---|---|---|---|---|---|---|---|
 | S02, S03, S05-S09 (each) | 43 | 43 | 43 | 43 | 43 | 43 | 43 |
 | S04 | 43 | 86 | 86 | 43 | 43 | 86 | 0 |
-| SYN_STROKE_01 (synthetic, test only) | 43 | 43 | 43 | 43 | 43 | 43 | 43 |
+| SP01 (stroke patient, test only) | 43 | 43 | 43 | 43 | 43 | 43 | 43 |
 
-That is 2,494 healthy windows for training and testing, and 301 synthetic-patient windows used only as an extra test. Classes are nearly balanced (class weights 0.92-1.18); `--class-weights` applies them to the loss.
+That is 2,494 healthy windows for training and testing, and 301 stroke-patient windows used only as an extra test (at the time of the runs below these came from the generated patient `SYN_STROKE_01`, now replaced by `SP01`). Classes are nearly balanced (class weights 0.92-1.18); `--class-weights` applies them to the loss.
 
 Options: `--step` (default 128), `--min-samples` (256), `--max-interp` (0.25), `--out`.
 
@@ -60,7 +60,7 @@ Splits come from `results/splits.json`, written by the baseline with S01 exclude
 
 **Baseline to beat (same 8 subjects, S01 excluded, `results/tables/baseline_finetune_subjects_metrics.csv`):**
 
-| Model | Leave-one-subject-out | Within-subject | Synthetic patient |
+| Model | Leave-one-subject-out | Within-subject | Synthetic patient `SYN_STROKE_01` (earlier file) |
 |---|---|---|---|
 | LDA | 34.7% | 36.9% | 26.5% |
 | SVM | **37.4%** (macro F1 0.330) | **39.2%** | 25.5% |
@@ -83,7 +83,7 @@ Installed and tested: torch 2.14.1 (MPS available), momentfm 0.1.4, peft 0.13.2,
 
 1. **Phase A, linear probe:** frozen encoder, train only the classification head (3,591 parameters); up to 15 epochs, learning rate 1e-3, early stopping after 4 epochs without validation improvement.
 2. **Phase B, LoRA:** rank-8 adapters on the encoder's attention q and v projections plus the head (118,279 trainable parameters); up to 15 epochs, learning rate 2e-4, same early stopping.
-3. Evaluate both phases on the held-out subjects, and the LoRA model also on the synthetic patient.
+3. Evaluate both phases on the held-out subjects, and the LoRA model also on the stroke patient.
 4. Save everything about the run in one committed folder, `models/moment/<run>/` (next section).
 
 ## Outputs and sharing
@@ -126,7 +126,7 @@ Two runs of MOMENT-1-small, without RevIN, saved in `models/moment/`. Both took 
 |---|---|---|---|
 | Holdout: test S07, S08, S09 (train S02-S05) | **45.5%** (macro F1 0.404) | 40.4% (macro F1 0.364), same training subjects | +5.1 points |
 | Leave-one-subject-out, 8 volunteers | **43.2%** (macro F1 0.369) | 37.4% (macro F1 0.330) | +5.8 points |
-| Synthetic stroke patient (trained on healthy only) | **43.4%** (mean over 8 LOSO models) | 25.5% (SVM), 36.7% (random forest) | +6.7 points over the best |
+| Synthetic stroke patient `SYN_STROKE_01` (trained on healthy only) | **43.4%** (mean over 8 LOSO models) | 25.5% (SVM), 36.7% (random forest) | +6.7 points over the best |
 
 The linear probe alone (Phase A) scores almost the same as LoRA (43.0% vs 43.2% LOSO; both 45.5% holdout): the pretrained encoder's features do most of the work, and the LoRA adapters add little on this amount of data.
 
@@ -149,6 +149,8 @@ What this means:
 - **Hand gestures improved clearly.** Hand_Open (+28 points) and Hand_Close (+11) are recognised far better; the 5.12 s window and the pretrained encoder capture the shape of the activity, not just its level.
 - **Directions are still not recognisable from one forearm channel** (Left/Right/Up/Down 3-32%). The camera must keep deciding direction, as the system design already does.
 - **Possible future use:** EMG could confirm hand open/close alongside the camera. That would need live windows of the same length and rate (5.12 s at 100 Hz) and a real-time test; it is not part of the current prototype.
+
+All runs below were made before the patient file changed: their patient column is the generated patient `SYN_STROKE_01`. Healthy results are unaffected.
 
 | Run folder | Split | Training data | LoRA accuracy (healthy) | Synthetic patient |
 |---|---|---|---|---|

@@ -1,5 +1,7 @@
 # Gamified Upper Limb Stroke Rehabilitation System with Communication Features
 
+> **Outdated (kept for reference).** This document describes an earlier plan. The current, checked documentation is in [docs/README.md](docs/README.md); [docs/corrections.md](docs/corrections.md) lists where this file differs from the built system. It is the original project concept; what was actually built is in [docs/overview.md](docs/overview.md#implementation-status).
+
 ## Project Overview
 
 This system is designed to help stroke patients rehabilitate their upper limb through gamified exercises. The system has two main components — a hardware system and a software system.

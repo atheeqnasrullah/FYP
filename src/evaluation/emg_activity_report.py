@@ -1,7 +1,7 @@
 """EMG activity analysis and data-quality report for the Dataset/ recordings.
 
 RMS/MAV describe the recorded envelope (ADC units), not clinical muscle strength.
-The stroke patient data is synthetic and is reported separately.
+The stroke patient is reported separately and never mixed with healthy data.
 """
 import argparse
 import numpy as np, pandas as pd
