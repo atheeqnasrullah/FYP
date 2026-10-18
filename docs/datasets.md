@@ -27,16 +27,17 @@ timestamp_ms,adc_value,subject_id,movement_label
 
 All 68 files were read on 2026-10-18:
 
-- **Sample rate:** 100 Hz, not the 1 kHz of the firmware and `config/settings.yaml`. Set `fs: 100` before windowing this data.
+- **Sample rate:** 100 Hz, not the 1 kHz of the firmware and `config/settings.yaml`. The dataset tools use 100 Hz automatically.
 - **Missing values:** none.
 - **Zeros:** 59.8% of healthy samples and 20.9% of patient samples are exactly 0, the envelope's resting floor.
-- **Saturation:** 0.57% of healthy samples sit at 4095, mostly during Hand_Close; the synthetic patient never saturates.
+- **Saturation:** 0.57% of healthy samples sit at 4095, mostly during Hand_Close (up to 8.4% in `S02_Hand_Close.csv`); the synthetic patient never saturates.
+- **Dropped samples:** S01 has about 2,400 short gaps of 20-560 ms (a lossy recording link); the other subjects have at most 7.
 - **Joined recordings:** most files are one 60 s recording (6,000 samples). Exceptions:
-    - S01 files run 1,652-7,789 samples with time gaps, and `S01_Down.csv` has a timestamp that jumps back 32 s.
+    - S01 files run 1,652-7,789 samples, and `S01_Down.csv` has a timestamp that jumps back 32 s.
     - S04 Hand_Close, Hand_Open and Up have 12,000 samples spread over up to 882 s.
     - `S02_Down.csv` has a 27 s gap.
 
-  Split these files at the gaps before windowing, so no window spans two recordings.
+  The loader splits these files at the gaps, so no window spans two recordings.
 
 ## Mean activity per movement
 
@@ -54,17 +55,21 @@ Mean `adc_value` over all samples (envelope units, not strength):
 
 Hand_Close produces by far the most activity, and Rest the least, in both groups. The synthetic patient is lower on most movements, but it is generated data and supports no clinical claim.
 
-## Code status
+## Code
 
-The following still point at the deleted `Datasets/` folder, so none of them can read `Dataset/` yet:
+`src/data/public_datasets.py` loads `Dataset/` into the repository's long format (`timestamp_ms, subject_id, session_id, trial_id, emg_value, label, cohort, source, signal_type, fs, file`):
 
-- `src/data/public_datasets.py` (loader) and `python -m src.features.build_dataset --source ...`
-- `src/realtime/emg_replay.py` (`python main.py live --emg-source replay`)
-- `src/models/finetune_moment.py`
-- `backend/webapi.py` dataset explorer (`DATASET_DIRS`)
-- `tests/test_datasets_and_models.py` and `tests/test_emg_replay.py` (6 failing tests)
+- Sources: `healthy` (S01-S09) and `stroke_synthetic`; `public` in the feature builder means both.
+- Each file is split into segments at gaps over 1 s or backwards timestamps, giving 73 segments (66 healthy, 7 patient); each segment is one trial, so windows never cross a gap.
+- Every row carries `fs` = 100, which the feature builder, replay and fine-tuning use for window sizes.
 
-See [known_issues.md](known_issues.md).
+```bash
+python -m src.data.public_datasets                          # summary of both sources
+python -m src.features.build_dataset --source public        # 41,066 windows of 200 ms
+python -m src.evaluation.emg_activity_report                # quality and activity tables, figures
+```
+
+The web app's EMG Datasets page, EMG replay (`--emg-source replay`) and MOMENT-1 fine-tuning all read this folder.
 
 ## Your own recordings
 

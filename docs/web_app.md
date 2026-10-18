@@ -10,11 +10,11 @@ RehabHub is the physiotherapist's single place to manage patients, launch games,
 | Patients | Coded patient records with session count, average and recent accuracy, trend and last game; add and search |
 | Patient detail | Clinical notes (age, affected side, stroke date, notes); progress over sessions; accuracy by movement; EMG activity by camera-detected movement; session history; CSV export; delete |
 | Sessions | Every session, filterable by patient and game; click a session to see each attempt; delete a session |
-| Game Launcher | Pick patient, game, input mode (webcam, webcam + EMG, keyboard, simulator), difficulty and length; start or stop the game; follow its live log |
+| Game Launcher | Pick patient, game, input mode (webcam, webcam + EMG sensor, webcam + EMG replay, keyboard, simulator), difficulty and length; start or stop the game; follow its live log |
 | EMG Datasets | Browse CSV files, plot the signal, compute RMS, MAV, VAR, peak and waveform length, and compare healthy with patient data per movement |
 | Settings | Light or dark theme, API address override, hardware summary, and an editor for `config/settings.yaml` that validates the YAML before saving |
 
-The EMG Datasets page reads `Datasets/` and `data/raw/emg/` only, so the new `Dataset/` folder does not appear in it yet (see [known_issues.md](known_issues.md)).
+The EMG Datasets page lists `Dataset/` (healthy volunteers and the synthetic patient) and your own recordings in `data/raw/emg/`.
 
 ## Running it
 

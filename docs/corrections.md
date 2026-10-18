@@ -50,7 +50,7 @@ The PDF combines an early `architecture.md`, `plan.md` and `implement.md`.
 | Auth: API key and dashboard login | No authentication |
 | Datasets: `hand_landmarks.csv`, `session_log.csv`, `Datasets/` | `data/raw/vision/*.csv`, the database, and `Dataset/` |
 | Repository lists `vision_features.py`; omits `webapp/`, `backend/webapi.py`, `difficulty.py` | See [architecture.md](architecture.md), section 6 |
-| `tests/` has 28 tests | 39 tests |
+| `tests/` has 28 tests | 41 tests |
 | 1000 Hz sampling | Live firmware 1 kHz; `Dataset/` 100 Hz |
 
 ## `implement.md` (repository root)
@@ -66,6 +66,6 @@ The PDF combines an early `architecture.md`, `plan.md` and `implement.md`.
 | What they say | What is true now |
 |---|---|
 | `Datasets/` holds 11 volunteers and 3 synthetic patients | `Dataset/` holds 9 volunteers and 1 synthetic patient |
-| 28 automated tests | 39 tests; 6 fail until the loader is migrated |
-| `--emg-source replay` works without the ESP32 | Broken until the loader is migrated |
-| Best baseline 28.8% leave-one-subject-out | Computed on the deleted data; must be re-run |
+| 28 automated tests | 41 tests, all passing |
+| `--emg-source replay` plays a recorded healthy volunteer | It now replays `Dataset/` (default S02) at 100 Hz |
+| Best baseline 28.8% leave-one-subject-out | That came from the deleted data; on `Dataset/` the best is 36.7% (SVM) |

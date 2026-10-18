@@ -22,7 +22,7 @@ EMG is cut into 200 ms windows every 100 ms and each window yields eight activit
 
 These describe electrical activity, not muscle strength.
 
-**Offline feature tables:** `python -m src.features.build_dataset` reads `data/raw/emg/` and writes `data/features/emg_features.csv`. The `--source healthy_raw|healthy_filtered|simulated_patient|public` options read the deleted `Datasets/` folder and currently fail.
+**Offline feature tables:** `python -m src.features.build_dataset` reads your recordings in `data/raw/emg/` (using `fs` from the settings) and writes `data/features/emg_features.csv`. `--source healthy|stroke_synthetic|public` reads `Dataset/` at its own 100 Hz and writes `data/features/emg_features_<source>.csv` (41,066 windows for `public`).
 
 ## Vision
 
@@ -67,5 +67,5 @@ EMG never overrides or suppresses a camera label. Its only effect on play is tha
 | Source | Code | When |
 |---|---|---|
 | ESP32 serial | `pipeline._emg` | `python main.py live` |
-| Dataset replay | `src/realtime/emg_replay.py` | `python main.py live --emg-source replay`; currently broken (reads the deleted `Datasets/`) |
+| Dataset replay | `src/realtime/emg_replay.py` | `python main.py live --emg-source replay`: plays `Dataset/` (default S02) in real time at 100 Hz |
 | None | | `vision`, `keyboard` and `sim` modes |

@@ -68,7 +68,7 @@ The older Streamlit dashboard still works: `streamlit run dashboard/dashboard.py
 | Simulator | `python main.py sim --game car` | Nothing; a random label every second |
 | Webcam only | `python main.py vision --game treasure` | Webcam |
 | Webcam + EMG sensor | `python main.py live --game shape` | Webcam, ESP32 + MD0437 |
-| Webcam + EMG replay | `python main.py live --emg-source replay --game car` | Webcam; currently broken, the replay recordings were removed |
+| Webcam + EMG replay | `python main.py live --emg-source replay --game car` | Webcam; EMG comes from a recorded volunteer in `Dataset/` (`EMG_REPLAY_SUBJECT=S05` picks another) |
 
 Options: `--patient P02`, `--difficulty auto|easy|medium|hard`, `--duration 120` (seconds, 0 = no limit). Games are `balloon`, `car`, `treasure` and `shape`.
 

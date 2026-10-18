@@ -2,64 +2,89 @@
 
 ## Automated tests
 
-`python -m pytest -q` runs 39 tests in about 45 s. On 2026-10-18, 33 pass and 6 fail; all 6 failures come from the deleted `Datasets/` folder, not from the games, API or web code.
+`python -m pytest -q` runs 41 tests in about 30 s, and all pass (2026-10-18, Python 3.11, main environment).
 
-| Test file | Tests | Covers | Status |
-|---|---|---|---|
-| `test_signal_processing.py` | 4 | Feature values, envelope vs raw filtering, windowing | Pass |
-| `test_fusion.py` | 3 | Confidence gate, majority smoothing, EMG features attached | Pass |
-| `test_backend.py` | 4 | Patient validation, session upload, progress, CSV export, open/attempt/close flow, errors | Pass |
-| `test_session_sync.py` | 2 | Offline queue keeps only failed uploads | Pass |
-| `test_dashboard.py` | 1 | Streamlit dashboard runs without an API | Pass |
-| `test_game_logic.py` | 4 | Difficulty presets, auto level up and down, level remembered per patient, results summary | Pass |
-| `test_games_headless.py` | 12 | All four games with scripted input on a hidden display: scoring, time limit, hand-position lanes, hand joystick, pick and drop by hand, latency logging | Pass |
-| `test_datasets_and_models.py` | 8 | Dataset loading and feature building (5), split gap, normalisation, runtime labels | 5 fail: `Datasets/` missing |
-| `test_emg_replay.py` | 1 | Replay feeds the live pipeline | Fails: replay reads `Datasets/` |
+| Test file | Tests | Covers |
+|---|---|---|
+| `test_signal_processing.py` | 4 | Feature values, envelope vs raw filtering, windowing |
+| `test_fusion.py` | 3 | Confidence gate, majority smoothing, EMG features attached |
+| `test_backend.py` | 5 | Patient validation, session upload, progress, CSV export, open/attempt/close flow, errors, replay mode in the web launcher |
+| `test_session_sync.py` | 2 | Offline queue keeps only failed uploads |
+| `test_dashboard.py` | 1 | Streamlit dashboard runs without an API |
+| `test_game_logic.py` | 4 | Difficulty presets, auto level up and down, level remembered per patient, results summary |
+| `test_games_headless.py` | 12 | All four games with scripted input on a hidden display: scoring, time limit, hand-position lanes, hand joystick, pick and drop by hand, latency logging |
+| `test_datasets_and_models.py` | 9 | `Dataset/` loading (both groups), labels match the games, synthetic patient kept separate, segment splitting, 100 Hz feature windows, split gap, normalisation |
+| `test_emg_replay.py` | 1 | Replay of `Dataset/` feeds the live pipeline |
 
 The tests set `SDL_VIDEODRIVER=dummy`, a temporary database (`REHAB_DB`) and a temporary difficulty file (`REHAB_GAME_STATE`), and skip the start and results screens (`REHAB_SKIP_SCREENS`), so they never touch real data.
 
-**Not automated yet:** a live webcam session, the ESP32 serial path, the React web app (no front-end tests), webcam gesture accuracy, latency against the 300 ms target, and the usability (SUS) study.
+Fine-tuning has its own check, run in the fine-tuning environment: `python -m src.models.finetune_moment --smoke` (see [fine_tuning_moment.md](fine_tuning_moment.md)).
 
-## Current dataset: activity per movement
+**Not automated yet:** a live webcam session, the ESP32 serial path, the React web app (no front-end tests; `npm run lint` and `npm run build` pass), webcam gesture accuracy, latency against the 300 ms target, and the usability (SUS) study.
 
-From the 2026-10-18 profile of `Dataset/` (see [datasets.md](datasets.md)): Hand_Close gives the highest mean envelope in healthy volunteers (547 ADC units) and Rest the lowest (12.4). Classifier results on this dataset do not exist yet, because the loaders still target the removed folder.
-
-## Previous results (removed `Datasets/` folder)
-
-These were computed on 2026-10-14 from the old `Datasets/` folder (11 healthy volunteers, 7 wrist and hand gestures, 1 kHz). That data has been deleted, so the numbers cannot be reproduced from the current repository and must be re-run on `Dataset/` before they go in a report.
-
-Accuracy, 7 classes (chance 14.3%), 4,578 windows of 200 ms:
-
-| Features | Model | Leave-one-subject-out | Within-subject (70/30 in time) | Train healthy, test synthetic patients |
-|---|---|---|---|---|
-| Rectified raw | LDA | 26.6% | 30.7% | 14.3% |
-| Rectified raw | SVM | **28.8%** | 35.9% | 14.3% |
-| Rectified raw | RF | 21.8% | 38.1% | 14.3% |
-| Per-subject z-score | LDA | **29.7%** | 32.9% | 17.0% |
-| Per-subject z-score | SVM | 27.3% | 38.8% | 17.9% |
-| Per-subject z-score | RF | 24.1% | **41.2%** | 16.6% |
-| Filtered envelope | SVM | 29.4% | 33.0% | not run |
-
-What they showed:
-
-- Rest was easy (SVM recalled it 81% of the time across subjects); each active gesture only 10-42%.
-- One EMG channel cannot separate seven gestures across people: about twice chance at best. This supports the design where the camera controls the games.
-- 92% of subject-gesture pairs had higher mean RMS than that person's Rest, so RMS/MAV works as an activity indicator.
-
-## How to reproduce (after migrating the loader to `Dataset/`)
+## Reproducing the results
 
 ```bash
-python -m src.features.build_dataset --source <source>
-python -m src.models.train_emg --features data/features/emg_features_<source>.csv
-python -m src.models.train_emg --features data/features/emg_features_<source>.csv --subject-norm
+python -m src.features.build_dataset --source public       # 41,066 windows from Dataset/
+python -m src.models.train_emg --features data/features/emg_features_public.csv   # about 18 min
 python -m src.evaluation.emg_activity_report
 ```
 
-Outputs go to `results/tables/`, `results/figures/` and `results/splits.json`.
+Outputs: `results/tables/baseline_public_metrics.csv`, `data_quality.csv`, `emg_activity_by_gesture.csv`, `emg_rms_relative_to_rest.csv`; `results/figures/confusion_baseline_public_*_loso.png`, `emg_rms_by_gesture.png`, `emg_rms_relative_to_rest.png`; `results/splits.json`.
+
+## Results: EMG movement classification (offline)
+
+Healthy volunteers in `Dataset/` (9 subjects, 7 movements, chance 14.3%), 36,873 windows of 200 ms (20 samples at 100 Hz), 8 features per window. Run on 2026-10-18.
+
+| Model | Leave-one-subject-out | Within-subject (70/30 in time) | Train healthy, test synthetic patient |
+|---|---|---|---|
+| LDA | 33.3% | 34.9% | 26.4% |
+| SVM (RBF, C=10) | **36.7%** | **37.5%** | 25.4% |
+| Random forest | 33.8% | 34.1% | **37.1%** |
+
+Macro F1 for the SVM across subjects is 0.321.
+
+Per-movement recall of the SVM across subjects (`confusion_baseline_public_SVM_loso.png`):
+
+| Movement | Recall |
+|---|---|
+| Rest | 81% |
+| Hand_Close | 65% |
+| Hand_Open | 46% (43% mistaken for Rest) |
+| Left | 21% |
+| Down | 18% |
+| Up | 15% |
+| Right | 7% |
+
+What this shows:
+
+- **Activity level is learnable, direction is not.** Rest and Hand_Close separate well because they are the quietest and loudest movements. Left, Right, Up and Down sit at or near chance: one forearm channel carries almost no information about direction.
+- **The camera must keep deciding movements.** This confirms the design: EMG is shown as activity feedback, and the camera produces the labels.
+- **Results are better than on the old dataset** (36.7% vs 28.8%), mainly because there are 60 s per movement instead of about 6 s, and the label set now includes easier activity contrasts.
+
+## Results: EMG activity per movement
+
+Mean window RMS in ADC units (`emg_activity_by_gesture.csv`):
+
+| Movement | Healthy (9) | Synthetic stroke patient |
+|---|---|---|
+| Hand_Close | 884.6 | 466.3 |
+| Up | 413.8 | 384.9 |
+| Down | 413.5 | 174.9 |
+| Right | 387.9 | 291.7 |
+| Left | 301.4 | 145.1 |
+| Hand_Open | 92.0 | 83.5 |
+| Rest | 38.5 | 41.5 |
+
+Relative to each volunteer's own Rest (`emg_rms_relative_to_rest.csv`), Hand_Close ranges from 7.3x (S03) to 117x (S02). S03's Hand_Open (0.41x) and Up (0.82x) fall below its Rest; every other subject-movement pair is above Rest. S01 has no Rest file and S04 no Down file. These are activity values, not strength.
+
+## Previous results (removed `Datasets/` folder)
+
+Computed on 2026-10-14 from the old `Datasets/` folder (11 volunteers, wrist and forearm gestures, 1 kHz), which was deleted on 2026-10-16. The best was 28.8% leave-one-subject-out (SVM). It cannot be reproduced from the repository and should not be reported alongside the results above.
 
 ## Latency (camera frame to game)
 
-Measured automatically in webcam modes: each fused command carries its camera frame's capture time, and the game logs the delay when it consumes the command (`data/logs/latency_<game>_<time>.csv`). Not measured yet; to measure:
+Measured automatically in webcam modes: each fused command carries its camera frame's capture time, and the game logs the delay when it consumes the command (`data/logs/latency_<game>_<time>.csv`). Not measured yet:
 
 ```bash
 python main.py vision --game car          # play for about a minute, then Esc
@@ -70,8 +95,8 @@ python -m src.evaluation.latency_report   # median, p95, % under 300 ms -> resul
 
 | Area | Method | Target |
 |---|---|---|
+| MOMENT-1 fine-tuning | `finetune_moment` holdout, then LOSO | Compare with the 36.7% SVM baseline |
 | Webcam gesture accuracy | Annotate recorded sessions; per-label precision and recall | Report honestly |
 | Latency | Latency report above | Median under 300 ms |
-| EMG activity | Activity report on `Dataset/` | Signal range, variability, missing data |
 | Usability | SUS questionnaire with 5+ volunteers | SUS above 68 |
 | Rehabilitation tracking | Score and accuracy across sessions in RehabHub | Visible trend |

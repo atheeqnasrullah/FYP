@@ -1,32 +1,38 @@
-# Model card: offline EMG gesture baseline
-
-> **Status:** trained on 2026-10-14 on the old `Datasets/` folder, which was deleted on 2026-10-16. Retrain on `Dataset/` once the loader is migrated ([known_issues.md](known_issues.md)).
+# Model card: offline EMG movement baseline
 
 | Item | Value |
 |---|---|
 | File | `src/models/saved/emg_model.joblib` (not committed) |
 | Content | `{"model": sklearn Pipeline, "features": [...], "labels": [...], "trained_on", "subject_norm"}` |
-| Model | StandardScaler + SVM (RBF, C=10), chosen by best leave-one-subject-out accuracy among LDA, SVM and RF |
-| Input | 8 features of one 200 ms window of single-channel EMG: RMS, MAV, VAR, STD, PEAK, WL, ZC, SSC |
-| Output | One of 7 labels: Hand_Close, Hand_Open, Pronation, Rest, Supination, Wrist_Extension, Wrist_Flexion |
-| Training data | 11 healthy volunteers (old `Datasets/`), 4,578 windows (654 per class) |
+| Model | StandardScaler + SVM (RBF, C=10), chosen by best leave-one-subject-out accuracy among LDA, SVM and random forest |
+| Input | 8 features of one 200 ms window (20 samples at 100 Hz) of the MD0437 envelope: RMS, MAV, VAR, STD, PEAK, WL, ZC, SSC |
+| Output | One of 7 labels: Rest, Hand_Open, Hand_Close, Left, Right, Up, Down |
+| Training data | `Dataset/Healthy_person`, 9 volunteers, 36,873 windows; trained 2026-10-18 |
 | Intended use | Offline research comparison only. **Not used to control games** and not a clinical tool |
-
-Note that the new `Dataset/` uses a different label set (Rest, Hand_Open, Hand_Close, Left, Right, Up, Down) and a 100 Hz sample rate, so a retrained model will not be comparable label for label.
 
 ## Performance (chance 14.3%)
 
 | Evaluation | Accuracy | Macro F1 |
 |---|---|---|
-| Leave-one-subject-out | 28.8% | 0.253 |
-| Within-subject (first 70% of each recording train, last 30% test, 2-window gap) | 35.9% | 0.326 |
-| Train healthy, test synthetic patients | 14.3% | 0.036 |
+| Leave-one-subject-out | 36.7% | 0.321 |
+| Within-subject (first 70% of each recording train, last 30% test, 2-window gap) | 37.5% | 0.331 |
+| Train healthy, test synthetic stroke patient | 25.4% | 0.201 |
+
+Recall across subjects: Rest 81%, Hand_Close 65%, Hand_Open 46%, Left 21%, Down 18%, Up 15%, Right 7%.
 
 ## Limitations
 
-- Single channel and about 6 s per gesture per person: too little information to tell wrist and hand gestures apart.
-- No per-user calibration in the saved model; per-subject z-scoring (`--subject-norm`) raised LDA cross-subject accuracy to 29.7% but needs that subject's unlabelled data.
-- Did not transfer to the synthetic patients (different amplitude scale).
+- Single channel: it separates activity levels (Rest, Hand_Open, Hand_Close) but not directions, which are near chance.
+- Hand_Open is confused with Rest 43% of the time; both are low-activity.
+- S01 lacks Rest and S04 lacks Down, so their folds miss a class; S01's recordings contain about 2,400 dropped-sample gaps.
+- The synthetic patient is generated data; transfer results say nothing about real patients.
+
+## Reproduce
+
+```bash
+python -m src.features.build_dataset --source public
+python -m src.models.train_emg --features data/features/emg_features_public.csv
+```
 
 ## Ethics
 

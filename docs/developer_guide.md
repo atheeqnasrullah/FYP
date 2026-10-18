@@ -17,11 +17,11 @@ How the code fits together, where to change things, and the rules that keep the 
 |---|---|
 | `main.py` | Parse mode, game, patient, difficulty, duration, EMG source; start threads; run the game |
 | `src/acquisition/` | `emg_logger` (EMG-only trials), `fused_logger` (EMG + camera labels), `landmark_recorder` (hand landmarks) |
-| `src/data/public_datasets.py` | Loader for the removed `Datasets/` folder (needs migrating to `Dataset/`) |
+| `src/data/public_datasets.py` | Loader for `Dataset/`: long format, 100 Hz, segments split at gaps over 1 s |
 | `src/preprocessing/` | `clean()` filters, `make_windows()` |
 | `src/features/` | `extract()` 8 features; `build_dataset.py` |
 | `src/models/train_emg.py` | LDA/SVM/RF baselines: LOSO, within-subject, cross-cohort; metrics, confusion matrices, `results/splits.json` |
-| `src/models/finetune_moment.py` | MOMENT-1 fine-tuning (pending approval) |
+| `src/models/finetune_moment.py` | MOMENT-1 fine-tuning: `--check-data`, `--smoke`, `--split holdout|loso` |
 | `src/evaluation/` | `emg_activity_report.py`, `latency_report.py` |
 | `src/vision/hand_tracker.py` | MediaPipe wrapper, hand features, `rule_classify` |
 | `src/fusion/fusion_engine.py` | Confidence gate, majority smoothing, EMG attachment |
@@ -54,12 +54,12 @@ Add it to `backend/webapi.py` (web app features) or `backend/app.py` (anything g
 | `REHAB_DB` | SQLite path for the API |
 | `REHAB_GAME_STATE` | Path of the per-patient difficulty file |
 | `REHAB_SKIP_SCREENS` | Skip start and results screens (tests) |
-| `EMG_REPLAY_SOURCE`, `EMG_REPLAY_SUBJECT` | Replay recording (needs migrating to `Dataset/`) |
+| `EMG_REPLAY_SOURCE`, `EMG_REPLAY_SUBJECT` | Replay recording (default `healthy`, `S02`) |
 | `SDL_VIDEODRIVER=dummy`, `SDL_AUDIODRIVER=dummy` | Headless Pygame (tests) |
 
 ## Tests
 
-`python -m pytest -q` runs 39 tests (33 pass, 6 fail on the removed `Datasets/`). See [testing_and_evaluation.md](testing_and_evaluation.md). Web app checks: `cd webapp && npm run lint && npm run build`.
+`python -m pytest -q` runs 41 tests, all passing. Fine-tuning code runs in `.venv-finetune` (`--smoke` checks it). See [testing_and_evaluation.md](testing_and_evaluation.md). Web app checks: `cd webapp && npm run lint && npm run build`.
 
 ## Git
 

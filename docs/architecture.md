@@ -10,7 +10,7 @@ This document describes the system as implemented on 2026-10-18 (branch `main`).
 flowchart TB
     subgraph Sensing
         EMG["EMG sensor MD0437 + ESP32<br/>1 kHz, USB serial 921600 baud"]
-        REPLAY["EMG dataset replay<br/>(no sensor; currently broken)"]
+        REPLAY["EMG dataset replay<br/>Dataset/ at 100 Hz, no sensor"]
         CAM["Webcam<br/>OpenCV frames"]
         KEY["Keyboard / simulator<br/>fallback input"]
     end
@@ -209,8 +209,8 @@ FYP/
 │   ├── acquisition/          emg_logger, fused_logger, landmark_recorder
 │   ├── preprocessing/        filters, windowing
 │   ├── features/             emg_features (8 features), build_dataset
-│   ├── data/                 public_datasets (still targets the removed Datasets/)
-│   ├── models/               train_emg (LDA/SVM/RF), finetune_moment (pending)
+│   ├── data/                 public_datasets (Dataset/ loader, segment splitting)
+│   ├── models/               train_emg (LDA/SVM/RF), finetune_moment (MOMENT-1, ready)
 │   ├── evaluation/           emg_activity_report, latency_report
 │   ├── vision/               hand_tracker (MediaPipe wrapper, rule_classify)
 │   ├── fusion/               fusion_engine
@@ -223,7 +223,7 @@ FYP/
 ├── Dataset/                  Healthy_person/S01-S09, stroke_patient/SYN_STROKE_01
 ├── data/                     models/ (MediaPipe), raw/, features/, logs/
 ├── results/                  tables/, figures/, splits.json
-├── tests/                    39 pytest tests
+├── tests/                    41 pytest tests
 └── docs/                     this documentation
 ```
 
@@ -243,7 +243,7 @@ Versions installed and tested on 2026-10-18.
 | Older dashboard | Streamlit 1.65, Plotly 7 |
 | Serial | pySerial 3.5 |
 | Tests | pytest 9.1 |
-| Fine-tuning (pending) | PyTorch, momentfm, peft |
+| Fine-tuning (separate `.venv-finetune`) | PyTorch 2.14, momentfm 0.1.4, peft 0.13, transformers 4.33, NumPy 1.25 |
 
 ## 8. Key design decisions
 

@@ -41,21 +41,21 @@ The built web app is also served at `/ui` when `webapp/dist` exists.
 | POST | `/games/launch` | `{"game","mode","patient_id","difficulty","duration_s"}` | Starts `main.py`; 400 on bad input, 409 if a game runs |
 | POST | `/games/stop` | none | Terminates the running game (kills it after 5 s) |
 | GET | `/games/log` | `lines` (1-1000, default 80) | Last lines of `data/logs/dashboard_game.log` |
-| GET | `/datasets` | none | CSV files under `Datasets/` and `data/raw/emg/` with rows, columns, size, category |
+| GET | `/datasets` | none | CSV files under `Dataset/` and `data/raw/emg/` with rows, columns, size, category (normal, patient, recorded) |
 | GET | `/datasets/signal` | `file`, `points` (50-10000) | Peak-preserving down-sampled signal per column, labels |
 | GET | `/datasets/features` | `file`, `window`, `step` | RMS, MAV, VAR, STD, peak, WL per movement; windowed RMS series |
 | GET | `/datasets/compare` | none | Mean RMS/MAV per movement for each dataset category |
 | GET | `/settings` | none | Parsed settings, labels and raw YAML |
 | PUT | `/settings` | `{"raw": "<yaml>"}` | Validates and writes `config/settings.yaml`; 400 on invalid YAML |
 
-`/datasets` only searches `Datasets/` and `data/raw/emg/`; the new `Dataset/` folder is not listed yet.
+For `Dataset/` files (one signal column plus `movement_label`), features and comparisons are grouped by movement.
 
 ## Models
 
 - **Patient:** `patient_id` (regex `^P[A-Za-z0-9_-]{1,20}$`), `age` 0-120, `affected_side`, `stroke_date`, `notes` (all optional except the ID).
 - **Attempt:** `target_movement`, `detected_movement`, `correct`, `reaction_time_ms` (>= 0); optional `ts`, `vision_label`, `emg_rms`, `emg_mav`, `confidence`.
 - **Session:** `patient_id`, `game_name`, `total_score`, `duration_s` (>= 0), `attempts`.
-- **Launch:** `game` (balloon, car, treasure, shape), `mode` (vision, live, keyboard, sim), `patient_id`, `difficulty` (auto, easy, medium, hard), `duration_s` (0-3600, default 180).
+- **Launch:** `game` (balloon, car, treasure, shape), `mode` (vision, live, replay, keyboard, sim; replay runs live mode with `--emg-source replay`), `patient_id`, `difficulty` (auto, easy, medium, hard), `duration_s` (0-3600, default 180).
 
 ## Session upload from games
 

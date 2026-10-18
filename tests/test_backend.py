@@ -47,3 +47,9 @@ def test_incremental_session_flow(client):
 def test_unknown_patient_rejected(client):
     assert client.post("/sessions", json={"patient_id": "P99", "game_name": "x", "total_score": 0, "duration_s": 0}).status_code == 404
     assert client.get("/patients/P99/progress").status_code == 404
+
+
+def test_web_launcher_offers_emg_replay(client):
+    info = client.get("/games").json()
+    assert "replay" in info["modes"]
+    assert all("replay" in game["modes"] for game in info["games"])

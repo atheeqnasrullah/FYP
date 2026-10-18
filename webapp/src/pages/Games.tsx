@@ -23,6 +23,7 @@ const DURATIONS = [
 const MODE_HELP: Record<string, string> = {
   vision: 'The webcam follows the hand; its picture appears behind the game.',
   live: 'Webcam controls the game; the EMG sensor adds muscle-activity readings. The game waits for sensor data.',
+  replay: 'Webcam controls the game; muscle-activity readings come from a recorded healthy volunteer, so no sensor is needed.',
   keyboard: 'Camera off. Arrow keys, O (open) and C (close).',
   sim: 'Simulated movements, for demonstrations without hardware.',
 }

@@ -61,6 +61,10 @@ def build_model(size, n_classes, device):
 
 def add_lora(model, rank):
     from peft import LoraConfig, get_peft_model
+    # peft reads model.config like a dict; MOMENT's config is a namespace without .get().
+    config = getattr(model, "config", None)
+    if config is not None and not hasattr(config, "get"):
+        config.get = lambda key, default=None: getattr(config, key, default)
     return get_peft_model(model, LoraConfig(r=rank, lora_alpha=2 * rank, lora_dropout=.1, target_modules=["q", "v"],
                                             modules_to_save=["head"]))
 
@@ -97,6 +101,9 @@ def smoke_test(args, X, y_idx, n_classes, device):
         loss = torch.nn.functional.cross_entropy(logits, yb); loss.backward(); opt.step()
         trainable = sum(p.numel() for p in params); total = sum(p.numel() for p in model.parameters())
         print(f"{phase}: logits {tuple(logits.shape)}, loss {loss.item():.3f}, trainable {trainable:,} of {total:,} parameters on {device}")
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        model.save_pretrained(tmp)  # the full run saves the adapter the same way
     print("Smoke test passed: ready to fine-tune.")
 
 

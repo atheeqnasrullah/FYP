@@ -1,31 +1,42 @@
 import numpy as np
 import pandas as pd
 import pytest
-from src.data.public_datasets import GESTURES, SOURCES, load_source
+from src.data.public_datasets import FS, GESTURES, load_source, segment_ids
 from src.features.build_dataset import build
 from src.features.emg_features import FEATURES
 from src.models.train_emg import subject_normalise, within_subject_split
 from src.utils.config import runtime_labels
 
 
-@pytest.mark.parametrize("source,subjects", [("healthy_raw", 11), ("healthy_filtered", 11), ("simulated_patient", 3)])
+@pytest.mark.parametrize("source,subjects", [("healthy", 9), ("stroke_synthetic", 1)])
 def test_sources_load_all_gestures(source, subjects):
     data = load_source(source)
     assert data.subject_id.nunique() == subjects
     assert sorted(data.label.unique()) == sorted(GESTURES)
-    assert data.emg_value.notna().all()
-    assert set(data.signal_type) == {SOURCES[source]["signal_type"]}
+    assert data.emg_value.notna().all() and data.emg_value.between(0, 4095).all()
+    assert set(data.signal_type) == {"envelope"} and set(data.fs) == {FS}
 
 
-def test_simulated_patients_are_kept_separate():
-    data = load_source("simulated_patient")
-    assert set(data.cohort) == {"simulated_patient"} and data.subject_id.str.startswith("SP").all()
+def test_gestures_match_runtime_labels():
+    assert sorted(GESTURES) == sorted(runtime_labels())
 
 
-def test_build_public_features():
-    features = build("simulated_patient")
+def test_synthetic_patient_is_kept_separate():
+    data = load_source("stroke_synthetic")
+    assert set(data.cohort) == {"stroke_synthetic"} and set(data.subject_id) == {"SYN_STROKE_01"}
+
+
+def test_segments_split_at_long_gaps_and_backward_steps():
+    ts = [0, 10, 20, 120, 130, 2000, 2010, 1500, 1510]
+    assert segment_ids(ts).tolist() == [0, 0, 0, 0, 0, 1, 1, 2, 2]
+
+
+def test_build_public_features_uses_dataset_rate():
+    features = build("stroke_synthetic")
     assert not features.empty and set(FEATURES) <= set(features.columns)
     assert features.groupby("trial_id").window_id.min().eq(0).all()
+    # 60 s at 100 Hz with 200 ms windows every 100 ms -> 599 windows per movement
+    assert features.groupby("label").size().eq(599).all()
 
 
 def test_within_subject_split_leaves_gap():

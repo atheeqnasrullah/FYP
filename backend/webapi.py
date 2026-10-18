@@ -178,20 +178,21 @@ def sync_pending():
 
 # ---------------------------------------------------------------- game launcher
 GAMES = [
-    {"id": "balloon", "name": "Balloon Pop", "modes": ["vision", "live", "keyboard", "sim"],
+    {"id": "balloon", "name": "Balloon Pop", "modes": ["vision", "live", "replay", "keyboard", "sim"],
      "description": "Reach to a balloon and make a full fist to pop it, then open the hand again.",
      "trains": ["Reaching", "Hand close", "Hand open"]},
-    {"id": "car", "name": "Car Driving", "modes": ["vision", "live", "keyboard", "sim"],
+    {"id": "car", "name": "Car Driving", "modes": ["vision", "live", "replay", "keyboard", "sim"],
      "description": "Hold the hand left, middle or right to pick a lane and catch stars; a fist brakes.",
      "trains": ["Side-to-side reach", "Holding a position", "Hand close"]},
-    {"id": "treasure", "name": "Treasure Hunt", "modes": ["vision", "live", "keyboard", "sim"],
+    {"id": "treasure", "name": "Treasure Hunt", "modes": ["vision", "live", "replay", "keyboard", "sim"],
      "description": "Push the hand like a joystick to walk the island, then open and close it at each chest.",
      "trains": ["Left / right / up / down", "Hand open", "Hand close"]},
-    {"id": "shape", "name": "Hand Gesture Shape Matching", "modes": ["vision", "live", "keyboard", "sim"],
+    {"id": "shape", "name": "Hand Gesture Shape Matching", "modes": ["vision", "live", "replay", "keyboard", "sim"],
      "description": "Grasp a shape with a fist, carry it to the matching hole and release it.",
      "trains": ["Grasp and release", "Reaching", "Precision"]},
 ]
-MODES = {"vision": "Webcam only", "live": "Webcam + EMG sensor", "keyboard": "Keyboard controls", "sim": "Simulator"}
+MODES = {"vision": "Webcam only", "live": "Webcam + EMG sensor", "replay": "Webcam + EMG replay (no sensor)",
+         "keyboard": "Keyboard controls", "sim": "Simulator"}
 LOG = ROOT / "data/logs/dashboard_game.log"
 _running: dict = {"proc": None, "info": None}
 
@@ -239,8 +240,11 @@ def launch(req: Launch):
         raise HTTPException(400, "Difficulty must be auto, easy, medium or hard")
     if _status()["running"]:
         raise HTTPException(409, "A game is already running. Stop it before starting another.")
-    command = [sys.executable, "-u", str(ROOT / "main.py"), req.mode, "--game", req.game, "--patient", req.patient_id.strip(),
-               "--difficulty", req.difficulty, "--duration", str(req.duration_s)]
+    # "replay" is live mode with EMG played from Dataset/ instead of the ESP32.
+    command = [sys.executable, "-u", str(ROOT / "main.py"), "live" if req.mode == "replay" else req.mode, "--game", req.game,
+               "--patient", req.patient_id.strip(), "--difficulty", req.difficulty, "--duration", str(req.duration_s)]
+    if req.mode == "replay":
+        command += ["--emg-source", "replay"]
     options = {"cwd": str(ROOT), "stdin": subprocess.DEVNULL}
     if sys.platform == "win32":
         options["creationflags"] = subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP
