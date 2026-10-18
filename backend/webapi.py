@@ -280,8 +280,13 @@ def game_log(lines: int = Query(80, ge=1, le=1000)):
 
 
 # ---------------------------------------------------------------- datasets
-DATASET_DIRS = [("Datasets", "Reference datasets"), ("data/raw/emg", "Recorded sessions")]
+DATASET_DIRS = [("Dataset", "Reference datasets"), ("data/raw/emg", "Recorded sessions")]
 SKIP_COLS = {"timestamp_ms", "subject_id", "session_id", "trial_id", "vision_confidence", "pointer_x", "pointer_y"}
+LABEL_COLS = ("label", "movement_label")
+
+
+def _label_col(df: pd.DataFrame):
+    return next((c for c in LABEL_COLS if c in df.columns), None)
 
 
 def _resolve(file: str) -> Path:
@@ -294,9 +299,9 @@ def _resolve(file: str) -> Path:
 
 def _category(rel: str) -> str:
     low = rel.lower()
-    if "patiant" in low or "patient" in low:
+    if "patiant" in low or "patient" in low or "stroke" in low:
         return "patient"
-    if "volunteer" in low or "normal" in low or "noraml" in low:
+    if "healthy" in low or "volunteer" in low or "normal" in low or "noraml" in low:
         return "filtered" if "filtered" in low else "normal"
     return "recorded"
 
@@ -359,7 +364,8 @@ def dataset_signal(file: str, points: int = Query(1200, ge=50, le=10000)):
     n = min(points, len(df))
     edges = np.linspace(0, len(df), n + 1).astype(int)[:-1]
     series = {c: [None if np.isnan(v) else round(float(v), 6) for v in _decimate(df[c].to_numpy(dtype=float), n)] for c in cols}
-    labels = df["label"].astype(str).to_numpy()[edges].tolist() if "label" in df.columns else None
+    label_col = _label_col(df)
+    labels = df[label_col].astype(str).to_numpy()[edges].tolist() if label_col else None
     ts = next((c for c in df.columns if str(c).lower() == "timestamp_ms"), None)
     index = (df[ts].to_numpy()[edges] if ts else edges).tolist()
     return {"file": file, "rows": len(df), "columns": cols, "index": index, "series": series, "labels": labels}
@@ -394,10 +400,11 @@ def dataset_features(file: str, window: int = Query(200, ge=10, le=5000), step: 
     result = {"file": file, "window": window, "step": step, "features": [], "rms_series": {}}
     if df.empty:
         return result
-    if "label" in df.columns and len(cols) == 1:
+    label_col = _label_col(df)
+    if label_col and len(cols) == 1:
         # Long format recordings: one emg column labelled by movement.
         col = cols[0]
-        for label, g in df.groupby("label"):
+        for label, g in df.groupby(label_col):
             result["features"].append({"movement": str(label), **_features(g[col].to_numpy(dtype=float))})
         result["rms_series"][col] = _windowed_rms(df[col].to_numpy(dtype=float), window, step)
     else:
@@ -415,11 +422,17 @@ def dataset_compare():
     acc: dict = {}
     for f in files:
         df = _frame(f["file"])
-        for col in _signal_columns(df):
-            feats = _features(df[col].to_numpy(dtype=float))
+        cols, label_col = _signal_columns(df), _label_col(df)
+        if label_col and len(cols) == 1:
+            # Long format (Dataset/): one signal column, movement in the label column.
+            parts = [(str(label), g[cols[0]]) for label, g in df.groupby(label_col)]
+        else:
+            parts = [(col, df[col]) for col in cols]
+        for movement, values in parts:
+            feats = _features(values.to_numpy(dtype=float))
             if not feats:
                 continue
-            bucket = acc.setdefault(f["category"], {}).setdefault(col, {"RMS": [], "MAV": []})
+            bucket = acc.setdefault(f["category"], {}).setdefault(movement, {"RMS": [], "MAV": []})
             bucket["RMS"].append(feats["RMS"]); bucket["MAV"].append(feats["MAV"])
     out = {}
     for cat, movements in acc.items():

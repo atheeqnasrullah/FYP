@@ -6,8 +6,8 @@ from src.preprocessing.filters import clean
 from src.preprocessing.windowing import make_windows
 from src.features.emg_features import extract
 
-PUBLIC_SOURCES = {"healthy_raw": ["healthy_raw"], "healthy_filtered": ["healthy_filtered"],
-                  "simulated_patient": ["simulated_patient"], "public": ["healthy_raw", "simulated_patient"]}
+PUBLIC_SOURCES = {"healthy": ["healthy"], "stroke_synthetic": ["stroke_synthetic"],
+                  "public": ["healthy", "stroke_synthetic"]}
 
 
 def recorded_frames():
@@ -28,14 +28,16 @@ def public_frames(name):
 
 
 def windows_from(df, cfg, default_signal_type, label_name):
-    rows = []; minimum = round(cfg["fs"] * cfg["window_ms"] / 1000)
+    rows = []
     for (subject, session, trial, label), group in df.groupby(["subject_id", "session_id", "trial_id", "label"]):
+        # Dataset/ sources carry their own sample rate; own recordings use config fs.
+        fs = int(group.fs.iloc[0]) if "fs" in group else cfg["fs"]
         raw = pd.to_numeric(group.emg_value, errors="coerce").dropna().to_numpy()
-        if len(raw) < minimum: continue
+        if len(raw) < max(round(fs * cfg["window_ms"] / 1000), 2): continue
         signal_type = group.signal_type.iloc[0] if "signal_type" in group else default_signal_type
-        try: filtered = clean(raw, cfg["fs"], *cfg["bandpass"], cfg["notch_hz"], signal_type)
+        try: filtered = clean(raw, fs, *cfg["bandpass"], cfg["notch_hz"], signal_type)
         except ValueError as e: print(f"Skipping {label_name} trial {trial}: {e}"); continue
-        for i, window in enumerate(make_windows(filtered, cfg["fs"], cfg["window_ms"], cfg["step_ms"])):
+        for i, window in enumerate(make_windows(filtered, fs, cfg["window_ms"], cfg["step_ms"])):
             rows.append({"subject_id": subject, "session_id": session, "trial_id": trial, "window_id": i,
                          "cohort": group.cohort.iloc[0], "source": group.source.iloc[0],
                          **extract(window, signal_type), "label": label})
@@ -57,10 +59,10 @@ def output_path(source):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Build windowed EMG feature tables")
     parser.add_argument("--source", choices=["recorded", *PUBLIC_SOURCES], default="recorded",
-                        help="recorded = data/raw/emg; others read Datasets/ (simulated_patient is synthetic)")
+                        help="recorded = data/raw/emg; others read Dataset/ (stroke_synthetic is generated data)")
     args = parser.parse_args(argv)
     out = build(args.source)
-    if out.empty: raise SystemExit("No usable samples. Record EMG data first or choose a Datasets/ source.")
+    if out.empty: raise SystemExit("No usable samples. Record EMG data first or choose a Dataset/ source.")
     dest = output_path(args.source); dest.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(dest, index=False); print(f"Saved {len(out)} windows to {dest}"); print(out.groupby(["cohort", "label"]).size())
 

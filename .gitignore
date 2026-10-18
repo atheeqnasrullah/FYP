@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+.venv-finetune/
 venv/
 data/raw/
 data/processed/

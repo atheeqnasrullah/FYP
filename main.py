@@ -9,7 +9,7 @@ def main():
     parser.add_argument("--patient",default="P01")
     parser.add_argument("--difficulty",choices=["auto","easy","medium","hard"],help="game difficulty; auto adapts to the patient (default from config/settings.yaml)")
     parser.add_argument("--duration",type=int,help="session length in seconds; 0 = no time limit (default from config/settings.yaml)")
-    parser.add_argument("--emg-source",choices=["serial","replay"],default="serial",help="live mode: ESP32 serial stream or a Datasets/ recording replayed at 1 kHz")
+    parser.add_argument("--emg-source",choices=["serial","replay"],default="serial",help="live mode: ESP32 serial stream or a Dataset/ recording replayed in real time")
     args=parser.parse_args()
     if args.mode=="sim":start_simulator()
     elif args.mode=="vision":start(use_emg=False,use_vision=True,show_preview=False)

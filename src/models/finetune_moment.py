@@ -4,8 +4,12 @@ Research only: games keep using camera labels. Requires requirements-finetune.tx
 (torch, momentfm, peft) and downloads weights from Hugging Face on first use.
 
   python -m src.models.finetune_moment --check-data          # no torch needed
+  python -m src.models.finetune_moment --smoke               # install check: one batch, no training
   python -m src.models.finetune_moment --split holdout       # quick run
   python -m src.models.finetune_moment --split loso          # comparable with baseline LOSO
+
+Data: Dataset/ healthy volunteers at 100 Hz, so one 512-sample window covers
+5.12 s. Windows are cut inside continuous recording segments only.
 
 Phase A trains only the classification head on the frozen encoder (linear probe).
 Phase B adds LoRA adapters to the encoder attention (q, v) and trains them with
@@ -21,7 +25,7 @@ STEP = 256
 MODEL_IDS = {"small": "AutonLab/MOMENT-1-small", "base": "AutonLab/MOMENT-1-base", "large": "AutonLab/MOMENT-1-large"}
 
 
-def make_windows(source="healthy_raw", norm="subject"):
+def make_windows(source="healthy", norm="subject"):
     """Return X [n, 1, 512], labels, subject ids. norm=subject keeps relative amplitude within a subject."""
     from src.data.public_datasets import load_source
     data = load_source(source)
@@ -80,6 +84,22 @@ def run_epochs(model, train, val, epochs, lr, device, patience):
     return best
 
 
+def smoke_test(args, X, y_idx, n_classes, device):
+    """Check the install end to end on one batch: model download, forward, backward, LoRA."""
+    import torch
+    xb, yb = torch.from_numpy(X[:args.batch_size]).to(device), torch.from_numpy(y_idx[:args.batch_size]).to(device)
+    model = build_model(args.size, n_classes, device)
+    for phase in ("linear probe", "LoRA"):
+        if phase == "LoRA": model = add_lora(model, args.lora_rank).to(device)
+        params = [p for p in model.parameters() if p.requires_grad]
+        opt = torch.optim.AdamW(params, lr=1e-4); opt.zero_grad()
+        logits = model(x_enc=xb).logits
+        loss = torch.nn.functional.cross_entropy(logits, yb); loss.backward(); opt.step()
+        trainable = sum(p.numel() for p in params); total = sum(p.numel() for p in model.parameters())
+        print(f"{phase}: logits {tuple(logits.shape)}, loss {loss.item():.3f}, trainable {trainable:,} of {total:,} parameters on {device}")
+    print("Smoke test passed: ready to fine-tune.")
+
+
 def predict(model, loader, device):
     import torch
     model.eval(); out = []
@@ -92,7 +112,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Fine-tune MOMENT-1 on the EMG gesture dataset (offline research model)")
     parser.add_argument("--size", choices=list(MODEL_IDS), default="small")
     parser.add_argument("--split", choices=["holdout", "loso"], default="holdout")
-    parser.add_argument("--source", default="healthy_raw")
+    parser.add_argument("--source", default="healthy")
     parser.add_argument("--norm", choices=["subject", "window", "none"], default="subject")
     parser.add_argument("--probe-epochs", type=int, default=15)
     parser.add_argument("--lora-epochs", type=int, default=15)
@@ -100,6 +120,7 @@ def main(argv=None):
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--patience", type=int, default=4)
     parser.add_argument("--check-data", action="store_true", help="build windows and folds only; no torch")
+    parser.add_argument("--smoke", action="store_true", help="load the model, run one training step per phase on one batch, save nothing")
     args = parser.parse_args(argv)
     X, y, groups = make_windows(args.source, args.norm)
     labels = sorted(set(y)); y_idx = np.array([labels.index(v) for v in y])
@@ -113,6 +134,9 @@ def main(argv=None):
     from sklearn.metrics import accuracy_score, f1_score
     torch.manual_seed(42); np.random.seed(42)
     device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+    if args.smoke:
+        smoke_test(args, X, y_idx, len(labels), device)
+        return
     loader = lambda m, shuffle: DataLoader(TensorDataset(torch.from_numpy(X[m]), torch.from_numpy(y_idx[m])), batch_size=args.batch_size, shuffle=shuffle)
     rows, all_true, all_pred = [], [], []
     for test in test_sets:

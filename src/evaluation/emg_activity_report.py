@@ -1,27 +1,30 @@
-"""EMG activity analysis and data-quality report for the Datasets/ recordings.
+"""EMG activity analysis and data-quality report for the Dataset/ recordings.
 
-RMS/MAV describe recorded electrical activity, not clinical muscle strength.
-Simulated patient data is synthetic and is reported separately.
+RMS/MAV describe the recorded envelope (ADC units), not clinical muscle strength.
+The stroke patient data is synthetic and is reported separately.
 """
 import argparse
 import numpy as np, pandas as pd
 from src.utils.config import ROOT
-from src.data.public_datasets import SOURCES, files, load_wide, GESTURES
+from src.data.public_datasets import SOURCES, files, read_file, segment_ids, GESTURES, STEP_MS
+
+ADC_MAX = 4095
 
 
 def quality_table():
     rows = []
     for source in SOURCES:
         for path in files(source):
-            wide = load_wide(path)
-            for label in GESTURES:
-                x = wide[label].to_numpy(float); finite = x[np.isfinite(x)]
-                peak = finite.max() if finite.size else np.nan
-                rows.append({"source": source, "file": path.name, "label": label, "samples": len(x),
-                             "duration_s": len(x) / 1000, "missing": int((~np.isfinite(x)).sum()),
-                             "min": finite.min(), "max": peak, "mean": finite.mean(), "std": finite.std(),
-                             "at_max_pct": 100 * float(np.mean(finite == peak)),
-                             "flat_pct": 100 * float(np.mean(np.diff(finite) == 0))})
+            df = read_file(path); x = pd.to_numeric(df.adc_value, errors="coerce").to_numpy(float)
+            step = np.diff(df.timestamp_ms.to_numpy(float))
+            finite = x[np.isfinite(x)]
+            rows.append({"source": source, "file": path.name, "subject_id": df.subject_id.iloc[0], "label": df.movement_label.iloc[0],
+                         "samples": len(x), "segments": int(segment_ids(df.timestamp_ms).max() + 1),
+                         "dropouts": int(np.sum(step > STEP_MS)), "backward_steps": int(np.sum(step <= 0)),
+                         "span_s": (df.timestamp_ms.iloc[-1] - df.timestamp_ms.iloc[0]) / 1000,
+                         "missing": int((~np.isfinite(x)).sum()), "min": finite.min(), "max": finite.max(),
+                         "mean": finite.mean(), "zero_pct": 100 * float(np.mean(finite == 0)),
+                         "saturated_pct": 100 * float(np.mean(finite >= ADC_MAX))})
     return pd.DataFrame(rows)
 
 
@@ -29,13 +32,12 @@ def plot_activity(features, dest):
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     cohorts = list(features.cohort.unique())
-    fig, axes = plt.subplots(1, len(cohorts), figsize=(6 * len(cohorts), 4.5), squeeze=False)
+    fig, axes = plt.subplots(1, len(cohorts), figsize=(6 * len(cohorts), 4.5), squeeze=False, sharey=True)
     for ax, cohort in zip(axes[0], cohorts):
         part = features[features.cohort == cohort]
         data = [part[part.label == g].RMS.to_numpy() for g in GESTURES]
         ax.boxplot(data, showfliers=False); ax.set_xticks(range(1, len(GESTURES) + 1), GESTURES, rotation=40, ha="right")
-        unit = "mV (synthetic)" if cohort == "simulated_patient" else "mV"
-        ax.set_ylabel(f"Window RMS, {unit}"); ax.set_title(f"EMG RMS by gesture: {cohort}")
+        ax.set_ylabel("Window RMS (ADC units)"); ax.set_title(f"EMG RMS by movement: {cohort}")
     fig.tight_layout(); fig.savefig(dest, dpi=150); plt.close(fig)
 
 
@@ -43,12 +45,12 @@ def plot_subject_heatmap(features, dest):
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     part = features[features.cohort == "healthy"]
-    table = part.pivot_table(index="subject_id", columns="label", values="RMS", aggfunc="mean")[GESTURES]
+    table = part.pivot_table(index="subject_id", columns="label", values="RMS", aggfunc="mean").reindex(columns=GESTURES)
     relative = table.div(table["Rest"], axis=0)
     fig, ax = plt.subplots(figsize=(8, 5))
-    im = ax.imshow(relative.to_numpy(), cmap="viridis")
+    im = ax.imshow(np.log10(relative.to_numpy(dtype=float)), cmap="viridis")
     ax.set_xticks(range(len(GESTURES)), GESTURES, rotation=40, ha="right"); ax.set_yticks(range(len(relative)), relative.index)
-    ax.set_title("Healthy volunteers: mean RMS relative to own Rest"); fig.colorbar(im, ax=ax, label="x Rest RMS")
+    ax.set_title("Healthy volunteers: mean RMS relative to own Rest (log10)"); fig.colorbar(im, ax=ax, label="log10(x Rest RMS)")
     fig.tight_layout(); fig.savefig(dest, dpi=150); plt.close(fig)
     return relative
 
@@ -60,12 +62,12 @@ def main(argv=None):
     tables, figures = ROOT / "results/tables", ROOT / "results/figures"
     tables.mkdir(parents=True, exist_ok=True); figures.mkdir(parents=True, exist_ok=True)
     quality = quality_table(); quality.to_csv(tables / "data_quality.csv", index=False)
-    summary = quality.groupby("source").agg(files=("file", "nunique"), recordings=("label", "size"),
-                                            mean_duration_s=("duration_s", "mean"), missing=("missing", "sum"),
-                                            max_at_max_pct=("at_max_pct", "max"))
+    summary = quality.groupby("source").agg(files=("file", "size"), subjects=("subject_id", "nunique"), samples=("samples", "sum"),
+                                            segments=("segments", "sum"), dropouts=("dropouts", "sum"), missing=("missing", "sum"),
+                                            max_saturated_pct=("saturated_pct", "max"))
     print(summary.round(2))
     features = pd.read_csv(args.features)
-    activity = features.groupby(["cohort", "label"])[["RMS", "MAV"]].agg(["mean", "std"]).round(4)
+    activity = features.groupby(["cohort", "label"])[["RMS", "MAV"]].agg(["mean", "std"]).round(2)
     activity.to_csv(tables / "emg_activity_by_gesture.csv"); print(activity)
     plot_activity(features, figures / "emg_rms_by_gesture.png")
     relative = plot_subject_heatmap(features, figures / "emg_rms_relative_to_rest.png")
