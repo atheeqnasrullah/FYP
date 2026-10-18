@@ -21,7 +21,7 @@ The system turns hand movements seen by a webcam into controls for four rehabili
 | G2 Measure muscle activity | The MD0437 EMG envelope gives RMS, MAV and six more features per 200 ms window |
 | G3 Engage the patient | Four Pygame games with start screens, a timer, rewards and adaptive difficulty |
 | G4 Monitor progress | Sessions go to a local FastAPI + SQLite service and appear in the RehabHub web app |
-| G5 Stay testable without hardware | Keyboard, simulator and EMG replay inputs; 44 automated tests |
+| G5 Stay testable without hardware | Keyboard, simulator and EMG replay inputs; 47 automated tests |
 
 **In scope:** single-channel EMG acquisition, webcam movement detection, four PC games, adaptive difficulty, local API and database, web app and Streamlit dashboard, offline EMG analysis and classifier research, healthy-volunteer data.
 

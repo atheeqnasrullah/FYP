@@ -19,13 +19,15 @@ How the code fits together, where to change things, and the rules that keep the 
 | `src/acquisition/` | `emg_logger` (EMG-only trials), `fused_logger` (EMG + camera labels), `landmark_recorder` (hand landmarks) |
 | `src/data/public_datasets.py` | Loader for `Dataset/`: long format, 100 Hz, segments split at gaps over 1 s |
 | `src/data/prepare_finetune.py` | Preprocess `Dataset/` into MOMENT-1 windows in `data/processed/moment/` |
+| `src/data/download_public.py` | Download public EMG data (UCI) into `Dataset/public/`, resume and verify |
+| `src/data/public_emg.py` | Convert public armband recordings into MD0437-like windows |
 | `src/preprocessing/` | `clean()` filters, `make_windows()` |
 | `src/features/` | `extract()` 8 features; `build_dataset.py` |
 | `src/models/train_emg.py` | LDA/SVM/RF baselines: LOSO, within-subject, cross-cohort; metrics, confusion matrices, `results/splits.json` |
 | `src/models/finetune_moment.py` | MOMENT-1 fine-tuning: `--check-data`, `--smoke`, `--split holdout|loso`; `load_finetuned()` |
 | `src/models/moment_predict.py` | Run a saved fine-tuned model on one person's recordings |
 | `models/moment/` | Committed fine-tuning runs (adapters, metrics, logs); see its README |
-| `src/evaluation/` | `emg_activity_report.py`, `latency_report.py` |
+| `src/evaluation/` | `emg_activity_report.py`, `latency_report.py`, `compare_models.py` (every model, same splits), `public_data_gain.py` (effect of public data) |
 | `src/vision/hand_tracker.py` | MediaPipe wrapper, hand features, `rule_classify` |
 | `src/fusion/fusion_engine.py` | Confidence gate, majority smoothing, EMG attachment |
 | `src/realtime/` | `pipeline.py` (threads, `latest`, command bus), `simulator.py`, `emg_replay.py` |
@@ -62,7 +64,7 @@ Add it to `backend/webapi.py` (web app features) or `backend/app.py` (anything g
 
 ## Tests
 
-`python -m pytest -q` runs 44 tests, all passing. Fine-tuning code runs in `.venv-finetune` (`--smoke` checks it). See [testing_and_evaluation.md](testing_and_evaluation.md). Web app checks: `cd webapp && npm run lint && npm run build`.
+`python -m pytest -q` runs 47 tests, all passing. Fine-tuning code runs in `.venv-finetune` (`--smoke` checks it). See [testing_and_evaluation.md](testing_and_evaluation.md). Web app checks: `cd webapp && npm run lint && npm run build`.
 
 ## Git
 

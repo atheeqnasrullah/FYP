@@ -1,0 +1,185 @@
+Extra training data: 2120 public windows (Rest, Hand_Open, Hand_Close) added to every training fold
+Fold test=['S02'] val=S09 train=['S03', 'S04', 'S05', 'S06', 'S07', 'S08'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.452
+  epoch 2: val accuracy 0.468
+  epoch 3: val accuracy 0.425
+  epoch 4: val accuracy 0.468
+  epoch 5: val accuracy 0.449
+  epoch 6: val accuracy 0.458
+ Phase B: LoRA
+  epoch 1: val accuracy 0.445
+  epoch 2: val accuracy 0.439
+  epoch 3: val accuracy 0.442
+  epoch 4: val accuracy 0.442
+  epoch 5: val accuracy 0.449
+  epoch 6: val accuracy 0.458
+  epoch 7: val accuracy 0.455
+  epoch 8: val accuracy 0.455
+  epoch 9: val accuracy 0.449
+  epoch 10: val accuracy 0.449
+  linear_probe on S02: accuracy 0.126
+  lora on S02: accuracy 0.179
+  lora on SYN_STROKE_01 (synthetic): accuracy 0.445
+Fold test=['S03'] val=S09 train=['S02', 'S04', 'S05', 'S06', 'S07', 'S08'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.442
+  epoch 2: val accuracy 0.458
+  epoch 3: val accuracy 0.429
+  epoch 4: val accuracy 0.475
+  epoch 5: val accuracy 0.449
+  epoch 6: val accuracy 0.472
+  epoch 7: val accuracy 0.488
+  epoch 8: val accuracy 0.472
+  epoch 9: val accuracy 0.449
+  epoch 10: val accuracy 0.435
+  epoch 11: val accuracy 0.468
+ Phase B: LoRA
+  epoch 1: val accuracy 0.465
+  epoch 2: val accuracy 0.455
+  epoch 3: val accuracy 0.462
+  epoch 4: val accuracy 0.458
+  epoch 5: val accuracy 0.458
+  linear_probe on S03: accuracy 0.150
+  lora on S03: accuracy 0.150
+  lora on SYN_STROKE_01 (synthetic): accuracy 0.449
+Fold test=['S04'] val=S09 train=['S02', 'S03', 'S05', 'S06', 'S07', 'S08'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.409
+  epoch 2: val accuracy 0.485
+  epoch 3: val accuracy 0.488
+  epoch 4: val accuracy 0.435
+  epoch 5: val accuracy 0.455
+  epoch 6: val accuracy 0.425
+  epoch 7: val accuracy 0.508
+  epoch 8: val accuracy 0.478
+  epoch 9: val accuracy 0.525
+  epoch 10: val accuracy 0.455
+  epoch 11: val accuracy 0.462
+  epoch 12: val accuracy 0.495
+  epoch 13: val accuracy 0.512
+ Phase B: LoRA
+  epoch 1: val accuracy 0.498
+  epoch 2: val accuracy 0.498
+  epoch 3: val accuracy 0.498
+  epoch 4: val accuracy 0.498
+  epoch 5: val accuracy 0.495
+  linear_probe on S04: accuracy 0.478
+  lora on S04: accuracy 0.504
+  lora on SYN_STROKE_01 (synthetic): accuracy 0.439
+Fold test=['S05'] val=S09 train=['S02', 'S03', 'S04', 'S06', 'S07', 'S08'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.429
+  epoch 2: val accuracy 0.442
+  epoch 3: val accuracy 0.422
+  epoch 4: val accuracy 0.432
+  epoch 5: val accuracy 0.435
+  epoch 6: val accuracy 0.435
+ Phase B: LoRA
+  epoch 1: val accuracy 0.422
+  epoch 2: val accuracy 0.432
+  epoch 3: val accuracy 0.425
+  epoch 4: val accuracy 0.429
+  epoch 5: val accuracy 0.445
+  epoch 6: val accuracy 0.435
+  epoch 7: val accuracy 0.435
+  epoch 8: val accuracy 0.442
+  epoch 9: val accuracy 0.435
+  linear_probe on S05: accuracy 0.508
+  lora on S05: accuracy 0.522
+  lora on SYN_STROKE_01 (synthetic): accuracy 0.409
+Fold test=['S06'] val=S09 train=['S02', 'S03', 'S04', 'S05', 'S07', 'S08'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.442
+  epoch 2: val accuracy 0.449
+  epoch 3: val accuracy 0.425
+  epoch 4: val accuracy 0.452
+  epoch 5: val accuracy 0.429
+  epoch 6: val accuracy 0.452
+  epoch 7: val accuracy 0.455
+  epoch 8: val accuracy 0.455
+  epoch 9: val accuracy 0.429
+  epoch 10: val accuracy 0.442
+  epoch 11: val accuracy 0.449
+ Phase B: LoRA
+  epoch 1: val accuracy 0.452
+  epoch 2: val accuracy 0.455
+  epoch 3: val accuracy 0.452
+  epoch 4: val accuracy 0.452
+  epoch 5: val accuracy 0.455
+  epoch 6: val accuracy 0.455
+  linear_probe on S06: accuracy 0.412
+  lora on S06: accuracy 0.432
+  lora on SYN_STROKE_01 (synthetic): accuracy 0.465
+Fold test=['S07'] val=S09 train=['S02', 'S03', 'S04', 'S05', 'S06', 'S08'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.432
+  epoch 2: val accuracy 0.445
+  epoch 3: val accuracy 0.419
+  epoch 4: val accuracy 0.435
+  epoch 5: val accuracy 0.419
+  epoch 6: val accuracy 0.429
+ Phase B: LoRA
+  epoch 1: val accuracy 0.419
+  epoch 2: val accuracy 0.422
+  epoch 3: val accuracy 0.419
+  epoch 4: val accuracy 0.422
+  epoch 5: val accuracy 0.439
+  epoch 6: val accuracy 0.439
+  epoch 7: val accuracy 0.429
+  epoch 8: val accuracy 0.445
+  epoch 9: val accuracy 0.439
+  epoch 10: val accuracy 0.435
+  epoch 11: val accuracy 0.439
+  epoch 12: val accuracy 0.439
+  linear_probe on S07: accuracy 0.415
+  lora on S07: accuracy 0.439
+  lora on SYN_STROKE_01 (synthetic): accuracy 0.402
+Fold test=['S08'] val=S09 train=['S02', 'S03', 'S04', 'S05', 'S06', 'S07'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.432
+  epoch 2: val accuracy 0.432
+  epoch 3: val accuracy 0.429
+  epoch 4: val accuracy 0.435
+  epoch 5: val accuracy 0.452
+  epoch 6: val accuracy 0.422
+  epoch 7: val accuracy 0.432
+  epoch 8: val accuracy 0.425
+  epoch 9: val accuracy 0.449
+ Phase B: LoRA
+  epoch 1: val accuracy 0.425
+  epoch 2: val accuracy 0.422
+  epoch 3: val accuracy 0.429
+  epoch 4: val accuracy 0.425
+  epoch 5: val accuracy 0.425
+  epoch 6: val accuracy 0.425
+  epoch 7: val accuracy 0.425
+  linear_probe on S08: accuracy 0.452
+  lora on S08: accuracy 0.478
+  lora on SYN_STROKE_01 (synthetic): accuracy 0.405
+Fold test=['S09'] val=S08 train=['S02', 'S03', 'S04', 'S05', 'S06', 'S07'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.475
+  epoch 2: val accuracy 0.488
+  epoch 3: val accuracy 0.435
+  epoch 4: val accuracy 0.488
+  epoch 5: val accuracy 0.452
+  epoch 6: val accuracy 0.472
+ Phase B: LoRA
+  epoch 1: val accuracy 0.455
+  epoch 2: val accuracy 0.442
+  epoch 3: val accuracy 0.458
+  epoch 4: val accuracy 0.462
+  epoch 5: val accuracy 0.478
+  epoch 6: val accuracy 0.478
+  epoch 7: val accuracy 0.472
+  epoch 8: val accuracy 0.478
+  epoch 9: val accuracy 0.475
+  linear_probe on S09: accuracy 0.432
+  lora on S09: accuracy 0.429
+  lora on SYN_STROKE_01 (synthetic): accuracy 0.382
+                        accuracy  macro_f1
+phase        test                         
+linear_probe healthy      0.3716    0.3061
+lora         healthy      0.3915    0.3342
+             synthetic    0.4244    0.3606

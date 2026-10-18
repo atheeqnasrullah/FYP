@@ -35,7 +35,7 @@ MODEL_IDS = {"small": "AutonLab/MOMENT-1-small", "base": "AutonLab/MOMENT-1-base
 # loads the same weights. The 150 MB base is downloaded once (MIT licence);
 # only the small fine-tuned adapters are committed to git.
 MODEL_REVISIONS = {"small": "411e288267f82cce86296dbe4d6c8bc533cc162f"}
-RUNS_DIR = ROOT / "models/moment"
+RUNS_DIR = __import__("pathlib").Path(__import__("os").environ.get("MOMENT_RUNS_DIR", ROOT / "models/moment"))  # override for test runs
 
 
 def load_windows(path=DATA):
@@ -48,6 +48,19 @@ def load_windows(path=DATA):
     healthy = pool["cohort"] == "healthy"
     split = lambda m: {k: v[m] for k, v in pool.items()}
     return split(healthy), split(~healthy), labels
+
+
+def load_public(path, labels=None):
+    """Public windows from src.data.public_emg. With labels, keep only shared labels, re-indexed to ours."""
+    d = np.load(path, allow_pickle=False)
+    public_labels = [str(v) for v in d["labels"]]
+    part = {k: d[k] for k in ("X", "mask", "y", "subject")}
+    if labels is None: return part, public_labels
+    names = np.array(public_labels)[part["y"]]
+    keep = np.isin(names, labels)
+    part = {k: v[keep] for k, v in part.items()}
+    part["y"] = np.array([labels.index(n) for n in names[keep]], dtype=np.int64)
+    return part, [l for l in labels if l in public_labels]
 
 
 def class_weights(path=DATA):
@@ -182,6 +195,10 @@ def main(argv=None):
     parser.add_argument("--patience", type=int, default=4)
     parser.add_argument("--check-data", action="store_true", help="build windows and folds only; no torch")
     parser.add_argument("--smoke", action="store_true", help="load the model, run one training step per phase on one batch, save nothing")
+    parser.add_argument("--extra-data", help="public windows (src.data.public_emg) added to every training fold, shared labels only")
+    parser.add_argument("--pretrain-data", help="public windows used to pre-train the LoRA adapters on their own labels first")
+    parser.add_argument("--pretrain-epochs", type=int, default=10)
+    parser.add_argument("--tag", default="", help="short name added to the run folder, e.g. uci_extra")
     args = parser.parse_args(argv)
     data, synthetic, labels = load_windows(args.data)
     groups = data["subject"]
@@ -203,9 +220,17 @@ def main(argv=None):
         return
     weights = class_weights(__import__("pathlib").Path(args.data)) if args.class_weights else None
     run_dir, log = start_run(args, labels, test_sets, device)
-    def loader(part, m, shuffle):
-        tensors = (torch.from_numpy(part["X"][m]), torch.from_numpy(part["mask"][m].astype(np.float32)), torch.from_numpy(part["y"][m]))
+    def loader(part, m, shuffle, extra=None):
+        X, mask, y = part["X"][m], part["mask"][m], part["y"][m]
+        if extra is not None:
+            X, mask, y = np.concatenate([X, extra["X"]]), np.concatenate([mask, extra["mask"]]), np.concatenate([y, extra["y"]])
+        tensors = (torch.from_numpy(X), torch.from_numpy(mask.astype(np.float32)), torch.from_numpy(y))
         return DataLoader(TensorDataset(*tensors), batch_size=args.batch_size, shuffle=shuffle)
+    extra = None
+    if args.extra_data:
+        extra, shared = load_public(args.extra_data, labels)
+        print(f"Extra training data: {len(extra['y'])} public windows ({', '.join(shared)}) added to every training fold")
+    lora_state = pretrain(args, device, loader, run_dir) if args.pretrain_data else None
     every_synthetic = np.ones(len(synthetic["y"]), bool)
     rows, epochs, all_true, all_pred = [], [], [], []
     for test in test_sets:
@@ -216,12 +241,20 @@ def main(argv=None):
         print(f"Fold test={test} val={val_subject} train={[s for s in train_subjects if s != val_subject]} on {device}", flush=True); started = time.time()
         torch.manual_seed(42)
         model = build_model(args.size, len(labels), device, args.revin)
+        if lora_state is not None:
+            # Start from the public-data adapters; the head is new because the labels differ.
+            model = add_lora(model, args.lora_rank).to(device)
+            unexpected = model.load_state_dict(lora_state, strict=False).unexpected_keys
+            if unexpected: raise RuntimeError(f"Pre-trained adapter does not fit: {unexpected[:3]}")
+            set_lora_trainable(model, False)
         print(" Phase A: linear probe")
-        _, history = run_epochs(model, loader(data, train_mask, True), loader(data, val_mask, False), args.probe_epochs, 1e-3, device, args.patience, weights)
+        _, history = run_epochs(model, loader(data, train_mask, True, extra), loader(data, val_mask, False), args.probe_epochs, 1e-3, device, args.patience, weights)
         epochs += [{"fold": fold, "phase": "linear_probe", **h} for h in history]
         probe = predict(model, loader(data, test_mask, False), device)
-        print(" Phase B: LoRA"); model = add_lora(model, args.lora_rank).to(device)
-        _, history = run_epochs(model, loader(data, train_mask, True), loader(data, val_mask, False), args.lora_epochs, 2e-4, device, args.patience, weights)
+        print(" Phase B: LoRA")
+        if lora_state is None: model = add_lora(model, args.lora_rank).to(device)
+        else: set_lora_trainable(model, True)
+        _, history = run_epochs(model, loader(data, train_mask, True, extra), loader(data, val_mask, False), args.lora_epochs, 2e-4, device, args.patience, weights)
         epochs += [{"fold": fold, "phase": "lora", **h} for h in history]
         lora = predict(model, loader(data, test_mask, False), device); true = data["y"][test_mask]
         results = [("linear_probe", fold, true, probe), ("lora", fold, true, lora)]
@@ -247,7 +280,30 @@ def main(argv=None):
     save_confusion([labels[i] for i in true], [labels[i] for i in pred], labels, f"MOMENT-1-{args.size} LoRA ({args.split})", run_dir / "confusion.png")
     finish_run(run_dir, metrics, summary)
     log.close()
-    print(f"Saved run to {run_dir.relative_to(ROOT)}")
+    print(f"Saved run to {run_dir.relative_to(ROOT) if run_dir.is_relative_to(ROOT) else run_dir}")
+
+
+def set_lora_trainable(model, trainable):
+    for name, param in model.named_parameters():
+        if "lora_" in name: param.requires_grad = trainable
+
+
+def pretrain(args, device, loader, run_dir):
+    """Train LoRA adapters + a temporary head on all public labels; return the adapter weights."""
+    part, public_labels = load_public(args.pretrain_data)
+    subjects = sorted(set(part["subject"])); val_subjects = subjects[-max(1, len(subjects) // 7):]
+    val = np.isin(part["subject"], val_subjects)
+    print(f"Pre-training on {len(part['y'])} public windows, {len(public_labels)} labels {public_labels}; "
+          f"validation subjects {val_subjects}", flush=True)
+    import torch
+    torch.manual_seed(42)
+    model = add_lora(build_model(args.size, len(public_labels), device, args.revin), args.lora_rank).to(device)
+    best, history = run_epochs(model, loader(part, ~val, True), loader(part, val, False), args.pretrain_epochs, 5e-4, device, args.patience)
+    print(f" pre-training best validation accuracy {best:.3f}", flush=True)
+    pd.DataFrame(history).to_csv(run_dir / "pretrain_epochs.csv", index=False)
+    model.save_pretrained(run_dir / "pretrain")
+    (run_dir / "pretrain" / "labels.json").write_text(json.dumps(public_labels))
+    return {k: v.detach().clone() for k, v in model.state_dict().items() if "lora_" in k}
 
 
 class _Tee:
@@ -274,7 +330,7 @@ def _environment(device):
 def start_run(args, labels, test_sets, device):
     """Create models/moment/<run_id>/ with run.json and a console log; returns (run_dir, tee)."""
     from datetime import datetime
-    run_id = f"{args.size}_{args.split}_{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run_id = f"{args.size}_{args.split}{'_' + args.tag if args.tag else ''}_{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     run_dir = RUNS_DIR / run_id; (run_dir / "folds").mkdir(parents=True)
     data_path = __import__("pathlib").Path(args.data)
     meta_path = data_path.with_name("metadata.json")

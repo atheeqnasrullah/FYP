@@ -2,7 +2,7 @@
 
 ## Automated tests
 
-`python -m pytest -q` runs 44 tests in about 30 s, and all pass (2026-10-18, Python 3.11, main environment).
+`python -m pytest -q` runs 47 tests in about 30 s, and all pass (2026-10-18, Python 3.11, main environment).
 
 | Test file | Tests | Covers |
 |---|---|---|
@@ -16,6 +16,7 @@
 | `test_datasets_and_models.py` | 9 | `Dataset/` loading (both groups), labels match the games, synthetic patient kept separate, segment splitting, 100 Hz feature windows, split gap, normalisation |
 | `test_emg_replay.py` | 1 | Replay of `Dataset/` feeds the live pipeline |
 | `test_prepare_finetune.py` | 3 | Fine-tuning preprocessing: 10 ms resampling, padding and masking, saved windows, S01 exclusion |
+| `test_public_emg.py` | 3 | Public-data envelope conversion, shared labels, safe archive extraction |
 
 The tests set `SDL_VIDEODRIVER=dummy`, a temporary database (`REHAB_DB`) and a temporary difficulty file (`REHAB_GAME_STATE`), and skip the start and results screens (`REHAB_SKIP_SCREENS`), so they never touch real data.
 
@@ -65,6 +66,10 @@ What this shows:
 - **The camera must keep deciding movements.** This confirms the design: EMG is shown as activity feedback, and the camera produces the labels.
 - **Results are better than on the old dataset** (36.7% vs 28.8%), mainly because there are 60 s per movement instead of about 6 s, and the label set now includes easier activity contrasts.
 
+## Results: MOMENT-1 and the full model comparison
+
+On the same 8 volunteers, fine-tuned MOMENT-1-small reaches 43.2% leave-one-subject-out, against 37.4% for the SVM on 200 ms windows. On equal 5.12 s windows the classical models catch up: SVM 47.3%, and frozen MOMENT features with a random forest 48.1%, the best result. Public UCI data did not raise the best accuracy (pre-training MOMENT on it: 44.4%). Full tables, per movement and per volunteer: [model_comparison.md](model_comparison.md).
+
 ## Results: EMG activity per movement
 
 Mean window RMS in ADC units (`emg_activity_by_gesture.csv`):
@@ -98,7 +103,6 @@ python -m src.evaluation.latency_report   # median, p95, % under 300 ms -> resul
 
 | Area | Method | Target |
 |---|---|---|
-| MOMENT-1 fine-tuning | `finetune_moment` holdout, then LOSO | Compare with the 36.7% SVM baseline |
 | Webcam gesture accuracy | Annotate recorded sessions; per-label precision and recall | Report honestly |
 | Latency | Latency report above | Median under 300 ms |
 | Usability | SUS questionnaire with 5+ volunteers | SUS above 68 |

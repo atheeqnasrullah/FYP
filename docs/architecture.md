@@ -195,6 +195,7 @@ Deleting a patient in the web app deletes their sessions, and attempts go with t
 | `data/raw/vision/*.csv` | Landmark recorder | 21 landmarks (x, y, z) per frame + label |
 | `data/features/*.csv`, `results/` | Feature builder, trainer, reports | Window features, metrics, figures, subject splits |
 | `data/processed/moment/` | `src.data.prepare_finetune` | Fine-tuning windows (`windows.npz`), `manifest.csv`, `metadata.json` |
+| `Dataset/public/`, `data/processed/public/` | `src.data.download_public`, `src.data.public_emg` | Downloaded public data and its converted windows (not in git) |
 | `models/moment/<run>/` (committed) | `src.models.finetune_moment` | Fine-tuned adapters, metrics, logs, settings for each run |
 | `config/settings.yaml` | You or the web app Settings page | All tunables |
 
@@ -211,9 +212,10 @@ FYP/
 │   ├── acquisition/          emg_logger, fused_logger, landmark_recorder
 │   ├── preprocessing/        filters, windowing
 │   ├── features/             emg_features (8 features), build_dataset
-│   ├── data/                 public_datasets (Dataset/ loader), prepare_finetune (MOMENT windows)
+│   ├── data/                 public_datasets (Dataset/ loader), prepare_finetune (MOMENT windows),
+│   │                         download_public, public_emg (public data)
 │   ├── models/               train_emg (LDA/SVM/RF), finetune_moment (MOMENT-1, ready)
-│   ├── evaluation/           emg_activity_report, latency_report
+│   ├── evaluation/           emg_activity_report, latency_report, compare_models, public_data_gain
 │   ├── vision/               hand_tracker (MediaPipe wrapper, rule_classify)
 │   ├── fusion/               fusion_engine
 │   ├── realtime/             pipeline (threads, command bus), simulator, emg_replay
@@ -222,11 +224,11 @@ FYP/
 ├── backend/                  app.py (session API, SQLite), webapi.py (web app API)
 ├── webapp/                   RehabHub: React 19 + TypeScript + Vite
 ├── dashboard/                dashboard.py (Streamlit, older)
-├── Dataset/                  Healthy_person/S01-S09, stroke_patient/SYN_STROKE_01
+├── Dataset/                  Healthy_person/S01-S09, stroke_patient/SYN_STROKE_01, public/ (downloaded, not in git)
 ├── data/                     models/ (MediaPipe), raw/, features/, logs/
 ├── models/moment/            committed fine-tuning runs (LoRA adapters, metrics, logs)
 ├── results/                  tables/, figures/, splits.json
-├── tests/                    44 pytest tests
+├── tests/                    47 pytest tests
 └── docs/                     this documentation
 ```
 

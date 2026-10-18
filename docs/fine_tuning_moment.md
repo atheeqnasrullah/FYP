@@ -1,6 +1,6 @@
 # Fine-tuning stage: MOMENT-1
 
-**Status (2026-10-18): ready, not started.** The data is preprocessed into model-ready windows, the fine-tuning environment is installed, the MOMENT-1-small weights are downloaded, and a smoke test has run one training step of each phase on the Apple GPU. Training itself has not been run.
+**Status (2026-10-18): done.** MOMENT-1-small was fine-tuned on the preprocessed `Dataset/` windows (holdout and 8-fold leave-one-subject-out). It beats the classical baseline by about 5-6 points, mainly by recognising Hand_Open and Hand_Close much better; directions stay near chance. Results below; the fine-tuned models are in `models/moment/`.
 
 ## Why MOMENT-1
 
@@ -116,6 +116,52 @@ uv pip install --python .venv-finetune/bin/python -r requirements-finetune.txt
 
 Verified before training: a model saved in this layout and reloaded gives identical outputs (maximum difference 0.0), and `moment_predict` reproduces the training calibration for S07 (mean 2.853).
 
+## Results (2026-10-18)
+
+Two runs of MOMENT-1-small, without RevIN, saved in `models/moment/`. Both took about 1 minute (holdout) and 7 minutes (8-fold leave-one-subject-out) on the M3 Pro GPU. Chance is 14.3%.
+
+**Compared with the classical baseline on the same subjects:**
+
+| Evaluation | MOMENT-1 LoRA | Best classical (SVM) | Difference |
+|---|---|---|---|
+| Holdout: test S07, S08, S09 (train S02-S05) | **45.5%** (macro F1 0.404) | 40.4% (macro F1 0.364), same training subjects | +5.1 points |
+| Leave-one-subject-out, 8 volunteers | **43.2%** (macro F1 0.369) | 37.4% (macro F1 0.330) | +5.8 points |
+| Synthetic stroke patient (trained on healthy only) | **43.4%** (mean over 8 LOSO models) | 25.5% (SVM), 36.7% (random forest) | +6.7 points over the best |
+
+The linear probe alone (Phase A) scores almost the same as LoRA (43.0% vs 43.2% LOSO; both 45.5% holdout): the pretrained encoder's features do most of the work, and the LoRA adapters add little on this amount of data.
+
+**Per volunteer (LOSO, LoRA):** S02 35.9%, S03 21.3%, S04 50.6%, S05 55.5%, S06 43.5%, S07 43.5%, S08 50.8%, S09 44.5%. S03 is the hardest: its Hand_Open and Up recordings are quieter than its own Rest ([datasets.md](datasets.md)).
+
+**Per movement (LOSO recall, `confusion.png`):**
+
+| Movement | MOMENT-1 | SVM baseline |
+|---|---|---|
+| Rest | 72% | 81% |
+| Hand_Open | 74% | 46% |
+| Hand_Close | 76% | 65% |
+| Left | 32% | 21% |
+| Right | 18% | 7% |
+| Up | 19% | 15% |
+| Down | 3% | 18% |
+
+What this means:
+
+- **Hand gestures improved clearly.** Hand_Open (+28 points) and Hand_Close (+11) are recognised far better; the 5.12 s window and the pretrained encoder capture the shape of the activity, not just its level.
+- **Directions are still not recognisable from one forearm channel** (Left/Right/Up/Down 3-32%). The camera must keep deciding direction, as the system design already does.
+- **Possible future use:** EMG could confirm hand open/close alongside the camera. That would need live windows of the same length and rate (5.12 s at 100 Hz) and a real-time test; it is not part of the current prototype.
+
+| Run folder | Split | Training data | LoRA accuracy (healthy) | Synthetic patient |
+|---|---|---|---|---|
+| `models/moment/small_holdout_20261018-134750` | holdout | Own data | 45.5% | 35.9% |
+| `models/moment/small_loso_20261018-134916` | loso, 8 folds | Own data | 43.2% | 43.4% |
+| `models/moment/small_loso_uci_extra_20261018-142536` | loso, 8 folds | Own + UCI windows (Rest, Hand_Open, Hand_Close) | 39.1% | 42.4% |
+| `models/moment/small_loso_uci_pretrain_20261018-143946` | loso, 8 folds | Pre-trained on UCI, then own data | **44.4%** | 42.2% |
+| `models/moment/small_loso_uci_pretrain_extra_20261018-144800` | loso, 8 folds | Pre-trained on UCI + UCI windows | 41.1% | 42.8% |
+
+Pre-trained runs also keep the public-data adapter in `pretrain/`. The public-data experiments and why they helped little are explained in [model_comparison.md](model_comparison.md#public-data-uci); the fairer comparison with classical models on equal 5.12 s windows is in the same document (best overall: frozen MOMENT features + random forest, 48.1%).
+
+For a single model to use, take the holdout adapter (`folds/S07+S08+S09`) or any LOSO fold; each was trained on 6 or 4 volunteers.
+
 ## Commands
 
 From `FYP/`:
@@ -129,7 +175,7 @@ From `FYP/`:
 .venv-finetune/bin/python -m src.models.moment_predict --adapter models/moment/<run>/folds/<fold> <csv files>   # 6. use it
 ```
 
-Other options: `--size base`, `--probe-epochs`, `--lora-epochs`, `--lora-rank`, `--batch-size`, `--patience`, `--class-weights`, `--revin`, `--data`.
+Other options: `--size base`, `--probe-epochs`, `--lora-epochs`, `--lora-rank`, `--batch-size`, `--patience`, `--class-weights`, `--revin`, `--data`, `--extra-data` (public windows added to training), `--pretrain-data` and `--pretrain-epochs` (pre-train LoRA on public data), `--tag` (name in the run folder).
 
 ## Smoke test result (2026-10-18)
 

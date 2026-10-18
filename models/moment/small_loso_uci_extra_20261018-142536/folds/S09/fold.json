@@ -1,0 +1,23 @@
+{
+  "test": [
+    "S09"
+  ],
+  "validation": "S08",
+  "train": [
+    "S02",
+    "S03",
+    "S04",
+    "S05",
+    "S06",
+    "S07"
+  ],
+  "labels": [
+    "Rest",
+    "Hand_Open",
+    "Hand_Close",
+    "Left",
+    "Right",
+    "Up",
+    "Down"
+  ]
+}

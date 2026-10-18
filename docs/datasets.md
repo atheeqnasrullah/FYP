@@ -73,6 +73,23 @@ The web app's EMG Datasets page, EMG replay (`--emg-source replay`) and MOMENT-1
 
 For fine-tuning, `python -m src.data.prepare_finetune` turns this folder into model-ready windows in `data/processed/moment/`; see [fine_tuning_moment.md](fine_tuning_moment.md#data-preprocessing).
 
+## Public data (UCI EMG Data for Gestures)
+
+To test whether outside data improves accuracy, one public dataset was downloaded and converted. It is not committed (see `.gitignore`); anyone can fetch it with the script.
+
+| Item | Value |
+|---|---|
+| Dataset | [UCI EMG Data for Gestures](https://archive.ics.uci.edu/dataset/481/emg+data+for+gestures) (Lobov et al., *Sensors* 2018), CC BY 4.0 |
+| Download | `python -m src.data.download_public` into `Dataset/public/uci_gestures/` (17 MB) |
+| Content | 36 healthy people, 8-channel Myo armband, about 1 kHz, 2 series x 6-7 gestures of about 1.8 s |
+| Labels | Rest, fist (= Hand_Close), extended palm (= Hand_Open, only a few people), wrist flexion, wrist extension, radial deviation, ulnar deviation |
+| Conversion | `python -m src.data.public_emg uci_gestures`: each armband channel is rectified, smoothed (100 ms moving RMS), resampled to 100 Hz and scaled to our ADC range, then windowed like `Dataset/` (log1p, calibration, 512-sample windows, short gestures padded and masked) |
+| Output | `data/processed/public/uci_gestures_windows.npz`: 6,288 windows (36 people x 8 channels); 2,120 share our labels (Rest 1,008, Hand_Close 1,048, Hand_Open 64) |
+
+The wrist movements keep their own names, because it is not known how they relate to our Left/Right/Up/Down. A second dataset, EMG-EPN-612 (612 people, 5.5 GB), was considered but its download was stopped; the script can still fetch it (`python -m src.data.download_public epn612`), but nothing uses it.
+
+How much the public data helped is in [model_comparison.md](model_comparison.md#public-data-uci).
+
 ## Your own recordings
 
 Follow [data_collection_protocol.md](data_collection_protocol.md):
