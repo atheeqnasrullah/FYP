@@ -20,3 +20,4 @@ results/tables/*
 !data/logs/
 !results/figures/
 !results/tables/
+data/processed/moment/

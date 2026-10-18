@@ -2,7 +2,7 @@
 
 ## Automated tests
 
-`python -m pytest -q` runs 41 tests in about 30 s, and all pass (2026-10-18, Python 3.11, main environment).
+`python -m pytest -q` runs 44 tests in about 30 s, and all pass (2026-10-18, Python 3.11, main environment).
 
 | Test file | Tests | Covers |
 |---|---|---|
@@ -15,6 +15,7 @@
 | `test_games_headless.py` | 12 | All four games with scripted input on a hidden display: scoring, time limit, hand-position lanes, hand joystick, pick and drop by hand, latency logging |
 | `test_datasets_and_models.py` | 9 | `Dataset/` loading (both groups), labels match the games, synthetic patient kept separate, segment splitting, 100 Hz feature windows, split gap, normalisation |
 | `test_emg_replay.py` | 1 | Replay of `Dataset/` feeds the live pipeline |
+| `test_prepare_finetune.py` | 3 | Fine-tuning preprocessing: 10 ms resampling, padding and masking, saved windows, S01 exclusion |
 
 The tests set `SDL_VIDEODRIVER=dummy`, a temporary database (`REHAB_DB`) and a temporary difficulty file (`REHAB_GAME_STATE`), and skip the start and results screens (`REHAB_SKIP_SCREENS`), so they never touch real data.
 
@@ -43,6 +44,8 @@ Healthy volunteers in `Dataset/` (9 subjects, 7 movements, chance 14.3%), 36,873
 | Random forest | 33.8% | 34.1% | **37.1%** |
 
 Macro F1 for the SVM across subjects is 0.321.
+
+With S01 excluded (the 8 subjects used for fine-tuning; `--exclude-subjects S01`), the SVM reaches 37.4% leave-one-subject-out and 39.2% within-subject; this is the baseline for MOMENT-1 ([fine_tuning_moment.md](fine_tuning_moment.md)).
 
 Per-movement recall of the SVM across subjects (`confusion_baseline_public_SVM_loso.png`):
 

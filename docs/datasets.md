@@ -71,6 +71,8 @@ python -m src.evaluation.emg_activity_report                # quality and activi
 
 The web app's EMG Datasets page, EMG replay (`--emg-source replay`) and MOMENT-1 fine-tuning all read this folder.
 
+For fine-tuning, `python -m src.data.prepare_finetune` turns this folder into model-ready windows in `data/processed/moment/`; see [fine_tuning_moment.md](fine_tuning_moment.md#data-preprocessing).
+
 ## Your own recordings
 
 Follow [data_collection_protocol.md](data_collection_protocol.md):

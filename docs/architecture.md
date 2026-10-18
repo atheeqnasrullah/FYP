@@ -194,6 +194,7 @@ Deleting a patient in the web app deletes their sessions, and attempts go with t
 | `data/raw/emg/*.csv` | EMG and fused loggers | Your own recordings |
 | `data/raw/vision/*.csv` | Landmark recorder | 21 landmarks (x, y, z) per frame + label |
 | `data/features/*.csv`, `results/` | Feature builder, trainer, reports | Window features, metrics, figures, subject splits |
+| `data/processed/moment/` | `src.data.prepare_finetune` | Fine-tuning windows (`windows.npz`), `manifest.csv`, `metadata.json` |
 | `config/settings.yaml` | You or the web app Settings page | All tunables |
 
 Raw data, the database, logs, feature tables and saved models are kept out of git by `.gitignore`. `Dataset/` is committed.
@@ -209,7 +210,7 @@ FYP/
 │   ├── acquisition/          emg_logger, fused_logger, landmark_recorder
 │   ├── preprocessing/        filters, windowing
 │   ├── features/             emg_features (8 features), build_dataset
-│   ├── data/                 public_datasets (Dataset/ loader, segment splitting)
+│   ├── data/                 public_datasets (Dataset/ loader), prepare_finetune (MOMENT windows)
 │   ├── models/               train_emg (LDA/SVM/RF), finetune_moment (MOMENT-1, ready)
 │   ├── evaluation/           emg_activity_report, latency_report
 │   ├── vision/               hand_tracker (MediaPipe wrapper, rule_classify)
@@ -223,7 +224,7 @@ FYP/
 ├── Dataset/                  Healthy_person/S01-S09, stroke_patient/SYN_STROKE_01
 ├── data/                     models/ (MediaPipe), raw/, features/, logs/
 ├── results/                  tables/, figures/, splits.json
-├── tests/                    41 pytest tests
+├── tests/                    44 pytest tests
 └── docs/                     this documentation
 ```
 

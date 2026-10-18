@@ -1,6 +1,6 @@
 # Fine-tuning stage: MOMENT-1
 
-**Status (2026-10-18): ready, not started.** The data loader reads `Dataset/`, the fine-tuning environment is installed, the MOMENT-1-small weights are downloaded, and a smoke test has run one training step of each phase on the Apple GPU. Training itself has not been run.
+**Status (2026-10-18): ready, not started.** The data is preprocessed into model-ready windows, the fine-tuning environment is installed, the MOMENT-1-small weights are downloaded, and a smoke test has run one training step of each phase on the Apple GPU. Training itself has not been run.
 
 ## Why MOMENT-1
 
@@ -13,6 +13,61 @@
 | Classification | Built-in head (`task_name="classification"`) | Task heads in a separate repository |
 | Hardware | Small: 35.3M parameters, runs on an Apple M3 Pro (MPS) | Small (3.6M parameters) |
 
+## Data preprocessing
+
+`python -m src.data.prepare_finetune` (runs in the main `.venv` in under a second) turns `Dataset/` into `data/processed/moment/`:
+
+| Step | What happens | Why |
+|---|---|---|
+| 1. Segment | Split each file at gaps over 1 s or backwards timestamps | Some files join several recordings; a window must not span two |
+| 2. Resample | Put each segment on an exact 10 ms grid; fill dropped samples by linear interpolation and flag them | MOMENT expects evenly spaced samples |
+| 3. Exclude | Leave out any subject with more than 25% interpolated samples: **S01 (39%)** | S01 lost 26-50% of samples in every file and has no Rest file; training on filled-in data would be training on invented signal |
+| 4. Transform | `log1p(adc)` | The envelope is zero-heavy and long-tailed (0 to 4095); the log keeps Rest (about 38) and Hand_Close (about 885) on one usable scale |
+| 5. Calibrate | z-score with each subject's own mean and spread (no labels used), clip to +/-6 | Removes person-to-person gain differences, like a per-patient calibration, while keeping the activity difference between movements |
+| 6. Window | 512 samples (5.12 s) every 128 samples (75% overlap), inside one segment; shorter segments of at least 256 samples are left-padded and masked | MOMENT's fixed input length; overlap gives more training windows |
+| 7. Filter | Drop single windows with more than 25% interpolated samples | Quality control |
+
+**Why per-subject calibration instead of MOMENT's own normalisation:** MOMENT's `classify()` normally applies RevIN, which rescales every window to zero mean and unit spread. That would erase each window's activity level, the very thing that separates Rest, Hand_Open and Hand_Close (the baseline recalls them at 81%, 46% and 65%, while directions are near chance). The training script therefore replaces RevIN with a pass-through and relies on step 5. `--revin` turns MOMENT's normalisation back on for comparison.
+
+**Output:**
+
+| File | Contents |
+|---|---|
+| `windows.npz` | `X` [n, 1, 512] float32, `mask` [n, 512], `y`, `labels`, `subject`, `cohort`, `label`, `segment`, `start_ms`, `interp_frac`, `saturated_frac` (no pickled objects) |
+| `manifest.csv` | One row per window with the same fields |
+| `metadata.json` | Parameters, label order, counts per subject and movement, calibration statistics, class weights, excluded subjects |
+
+**Result (2026-10-18):** 2,795 windows from 66 segments, none padded or dropped.
+
+| Subject | Rest | Hand_Open | Hand_Close | Left | Right | Up | Down |
+|---|---|---|---|---|---|---|---|
+| S02, S03, S05-S09 (each) | 43 | 43 | 43 | 43 | 43 | 43 | 43 |
+| S04 | 43 | 86 | 86 | 43 | 43 | 86 | 0 |
+| SYN_STROKE_01 (synthetic, test only) | 43 | 43 | 43 | 43 | 43 | 43 | 43 |
+
+That is 2,494 healthy windows for training and testing, and 301 synthetic-patient windows used only as an extra test. Classes are nearly balanced (class weights 0.92-1.18); `--class-weights` applies them to the loss.
+
+Options: `--step` (default 128), `--min-samples` (256), `--max-interp` (0.25), `--out`.
+
+## Subject splits
+
+Splits come from `results/splits.json`, written by the baseline with S01 excluded, so MOMENT and LDA/SVM/RF are scored on the same people.
+
+| Split | Train | Validation (early stopping) | Test |
+|---|---|---|---|
+| `holdout` | S02-S05 | S06 | S07, S08, S09: 903 windows, 129 per movement |
+| `loso` | All but two subjects | The last remaining training subject | One subject per fold, 8 folds |
+
+**Baseline to beat (same 8 subjects, S01 excluded, `results/tables/baseline_finetune_subjects_metrics.csv`):**
+
+| Model | Leave-one-subject-out | Within-subject | Synthetic patient |
+|---|---|---|---|
+| LDA | 34.7% | 36.9% | 26.5% |
+| SVM | **37.4%** (macro F1 0.330) | **39.2%** | 25.5% |
+| Random forest | 34.6% | 35.8% | **36.7%** |
+
+The baseline classifies 200 ms windows from 8 features; MOMENT sees 5.12 s of raw envelope per decision, so it has more context. Report both window lengths when comparing.
+
 ## Separate environment
 
 `momentfm` 0.1.4 pins NumPy 1.25.2 and transformers 4.33.3. Installing it into the main `.venv` would downgrade NumPy and break pandas 3, SciPy 1.17 and scikit-learn 1.9, so fine-tuning uses its own environment, `.venv-finetune` (ignored by git):
@@ -22,52 +77,39 @@ uv venv --python 3.11 .venv-finetune
 uv pip install --python .venv-finetune/bin/python -r requirements-finetune.txt
 ```
 
-Installed and tested versions: torch 2.14.1 (MPS available), momentfm 0.1.4, peft 0.13.2, transformers 4.33.3, NumPy 1.25.2, pandas 2.1.4, scikit-learn 1.3.2.
-
-## Data
-
-`src/models/finetune_moment.py` reads `Dataset/Healthy_person` through `src/data/public_datasets.py`:
-
-- 512-sample windows (5.12 s at 100 Hz) with a 256-sample step, cut only inside continuous recording segments: **1,349 windows**, 9 subjects, 7 movements.
-- Each subject's signal is z-scored over all of that subject's samples, which keeps the relative activity between movements.
-- Subject splits come from `results/splits.json`, written by the baseline, so both are scored on the same people:
-
-| Split | Train | Validation (early stopping) | Test |
-|---|---|---|---|
-| `holdout` | S01-S05 | S06 | S07, S08, S09 (462 windows) |
-| `loso` | All but two subjects | The last remaining training subject | One subject per fold, 9 folds |
+Installed and tested: torch 2.14.1 (MPS available), momentfm 0.1.4, peft 0.13.2, transformers 4.33.3, NumPy 1.25.2, pandas 2.1.4, scikit-learn 1.3.2.
 
 ## Training plan
 
-1. **Phase A, linear probe:** frozen encoder, train only the classification head (3,591 parameters); up to 15 epochs, learning rate 1e-3, early stopping after 4 epochs without improvement.
+1. **Phase A, linear probe:** frozen encoder, train only the classification head (3,591 parameters); up to 15 epochs, learning rate 1e-3, early stopping after 4 epochs without validation improvement.
 2. **Phase B, LoRA:** rank-8 adapters on the encoder's attention q and v projections plus the head (118,279 trainable parameters); up to 15 epochs, learning rate 2e-4, same early stopping.
-3. Report accuracy and macro F1 per phase in `results/tables/moment_small_<split>_metrics.csv`, a confusion matrix in `results/figures/`, and save the last fold's adapter to `src/models/saved/moment_small_<split>/`.
-
-**Baseline to beat:** SVM, 36.7% leave-one-subject-out on the same subjects ([testing_and_evaluation.md](testing_and_evaluation.md)). Note the baseline uses 200 ms windows and MOMENT 5.12 s windows, so MOMENT sees more context per decision.
+3. Evaluate both phases on the held-out subjects, and the LoRA model also on the synthetic patient.
+4. Write `results/tables/moment_small_<split>_metrics.csv`, `results/figures/confusion_moment_small_<split>.png`, and save the last fold's adapter, labels and training arguments to `src/models/saved/moment_small_<split>/`.
 
 ## Commands
 
-Run from `FYP/` with the fine-tuning environment:
+From `FYP/`:
 
 ```bash
-.venv-finetune/bin/python -m src.models.finetune_moment --check-data       # windows and folds
-.venv-finetune/bin/python -m src.models.finetune_moment --smoke            # one step per phase, saves nothing
-.venv-finetune/bin/python -m src.models.finetune_moment --split holdout    # first real run
-.venv-finetune/bin/python -m src.models.finetune_moment --split loso       # final comparison (9 folds)
+.venv/bin/python -m src.data.prepare_finetune                              # 1. preprocess
+.venv-finetune/bin/python -m src.models.finetune_moment --check-data       # 2. windows and folds
+.venv-finetune/bin/python -m src.models.finetune_moment --smoke            # 3. one step per phase, saves nothing
+.venv-finetune/bin/python -m src.models.finetune_moment --split holdout    # 4. first real run
+.venv-finetune/bin/python -m src.models.finetune_moment --split loso       # 5. final comparison (8 folds)
 ```
 
-Useful options: `--size base` (larger model), `--probe-epochs`, `--lora-epochs`, `--lora-rank`, `--batch-size`, `--patience`, `--norm subject|window|none`.
+Other options: `--size base`, `--probe-epochs`, `--lora-epochs`, `--lora-rank`, `--batch-size`, `--patience`, `--class-weights`, `--revin`, `--data`.
 
 ## Smoke test result (2026-10-18)
 
 ```text
-1349 windows of 512 samples, 7 classes, 9 subjects, 1 fold(s)
-linear probe: logits (32, 7), loss 2.109, trainable 3,591 of 35,340,999 parameters on mps
-LoRA: logits (32, 7), loss 2.114, trainable 118,279 of 35,459,278 parameters on mps
+2494 healthy windows of 512 samples, 7 classes, 8 subjects, 1 fold(s); 301 synthetic-patient windows for extra testing
+linear probe: logits (32, 7), loss 1.938, trainable 3,591 of 35,340,999 parameters on mps
+LoRA: logits (32, 7), loss 1.941, trainable 118,279 of 35,459,278 parameters on mps
 Smoke test passed: ready to fine-tune.
 ```
 
-The smoke test found and fixed one incompatibility: peft 0.13 reads the model config like a dictionary, and MOMENT's config has no `.get()`, so `add_lora()` adds one before wrapping the model.
+The smoke test also saves the adapter to a temporary folder. It found and fixed one incompatibility: peft 0.13 reads the model config like a dictionary, and MOMENT's config has no `.get()`, so `add_lora()` adds one.
 
 ## How the result is used
 

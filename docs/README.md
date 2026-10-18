@@ -28,7 +28,7 @@ The system is a research prototype, not a certified medical device.
 | Document | Covers |
 |---|---|
 | [developer_guide.md](developer_guide.md) | Design rules, module map, adding games and endpoints, environment variables |
-| [testing_and_evaluation.md](testing_and_evaluation.md) | The 41 tests, classifier and activity results, latency, evaluation still to do |
+| [testing_and_evaluation.md](testing_and_evaluation.md) | The 44 tests, classifier and activity results, latency, evaluation still to do |
 | [model_card_baseline.md](model_card_baseline.md) | The offline LDA/SVM/RF baseline |
 | [fine_tuning_moment.md](fine_tuning_moment.md) | MOMENT-1 fine-tuning: environment, data, commands (ready to run) |
 | [known_issues.md](known_issues.md) | Open issues, issues fixed, and the prototype's limitations |
@@ -44,8 +44,8 @@ The system is a research prototype, not a certified medical device.
 
 ## Status at a glance (2026-10-18)
 
-- **Working:** webcam control of four games, adaptive difficulty, session storage, RehabHub web app, Streamlit dashboard, offline session queue, EMG replay from `Dataset/`. All 41 tests pass.
+- **Working:** webcam control of four games, adaptive difficulty, session storage, RehabHub web app, Streamlit dashboard, offline session queue, EMG replay from `Dataset/`. All 44 tests pass.
 - **Results:** best offline EMG classifier (SVM) 36.7% leave-one-subject-out on 7 movements (chance 14.3%).
-- **Fine-tuning:** ready to start; environment installed and smoke test passed ([fine_tuning_moment.md](fine_tuning_moment.md)).
+- **Fine-tuning:** data preprocessed (2,494 healthy windows, 8 volunteers), environment installed, smoke test passed; ready to start ([fine_tuning_moment.md](fine_tuning_moment.md)).
 - **Not built:** login, patient-therapist communication, wireless EMG, battery pack.
 - **Not measured:** latency, webcam gesture accuracy, usability.

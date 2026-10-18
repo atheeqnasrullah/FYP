@@ -78,12 +78,15 @@ def main(argv=None):
     parser.add_argument("--cohort", default="healthy", help="cohort used for training (ignored when the file has no cohort column)")
     parser.add_argument("--subject-norm", action="store_true", help="z-score features per subject (unsupervised calibration)")
     parser.add_argument("--tag", default=None, help="name used for result files (default: features file stem)")
+    parser.add_argument("--exclude-subjects", nargs="*", default=[], help="leave these subjects out entirely (e.g. S01, excluded from fine-tuning for sample loss)")
+    parser.add_argument("--no-save", action="store_true", help="evaluate only; keep the existing saved model")
     args = parser.parse_args(argv)
     path = ROOT / args.features if not str(args.features).startswith("/") else args.features
     path = __import__("pathlib").Path(path)
     if not path.exists(): raise SystemExit("Build features first with python -m src.features.build_dataset")
     data = pd.read_csv(path).dropna(subset=FEATURES + ["label", "subject_id", "trial_id"])
     if "cohort" not in data: data["cohort"] = "recorded"
+    data = data[~data.subject_id.astype(str).isin(args.exclude_subjects)]
     if args.subject_norm: data = subject_normalise(data)
     df = data[data.cohort == args.cohort] if args.cohort in set(data.cohort) else data
     if df.trial_id.nunique() < 2: raise SystemExit("Need at least two trials for grouped evaluation")
@@ -115,6 +118,9 @@ def main(argv=None):
     metrics = pd.DataFrame(rows); tables.mkdir(parents=True, exist_ok=True)
     metrics.to_csv(tables / f"{tag}_metrics.csv", index=False)
     print(metrics.pivot_table(index="model", columns="evaluation", values="accuracy").round(3))
+    if args.no_save:
+        print(f"Best: {best[1]}; model not saved (--no-save); metrics in {tables / f'{tag}_metrics.csv'}")
+        return metrics
     best[2].fit(X, y)
     dest = ROOT / "src/models/saved/emg_model.joblib"; dest.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump({"model": best[2], "features": FEATURES, "labels": labels, "trained_on": str(path.name), "subject_norm": args.subject_norm}, dest)
