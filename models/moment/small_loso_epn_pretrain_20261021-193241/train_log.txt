@@ -1,0 +1,209 @@
+Pre-training on 60000 public windows, 6 labels ['Rest', 'Hand_Open', 'Hand_Close', 'Pinch', 'Wrist_Extension', 'Wrist_Flexion']; validation subjects ['EPNtrain_user297', 'EPNtrain_user298', 'EPNtrain_user299', 'EPNtrain_user3', 'EPNtrain_user30', 'EPNtrain_user300', 'EPNtrain_user301', 'EPNtrain_user302', 'EPNtrain_user303', 'EPNtrain_user304', 'EPNtrain_user305', 'EPNtrain_user306', 'EPNtrain_user31', 'EPNtrain_user32', 'EPNtrain_user33', 'EPNtrain_user34', 'EPNtrain_user35', 'EPNtrain_user36', 'EPNtrain_user37', 'EPNtrain_user38', 'EPNtrain_user39', 'EPNtrain_user4', 'EPNtrain_user40', 'EPNtrain_user41', 'EPNtrain_user42', 'EPNtrain_user43', 'EPNtrain_user44', 'EPNtrain_user45', 'EPNtrain_user46', 'EPNtrain_user47', 'EPNtrain_user48', 'EPNtrain_user49', 'EPNtrain_user5', 'EPNtrain_user50', 'EPNtrain_user51', 'EPNtrain_user52', 'EPNtrain_user53', 'EPNtrain_user54', 'EPNtrain_user55', 'EPNtrain_user56', 'EPNtrain_user57', 'EPNtrain_user58', 'EPNtrain_user59', 'EPNtrain_user6', 'EPNtrain_user60', 'EPNtrain_user61', 'EPNtrain_user62', 'EPNtrain_user63', 'EPNtrain_user64', 'EPNtrain_user65', 'EPNtrain_user66', 'EPNtrain_user67', 'EPNtrain_user68', 'EPNtrain_user69', 'EPNtrain_user7', 'EPNtrain_user70', 'EPNtrain_user71', 'EPNtrain_user72', 'EPNtrain_user73', 'EPNtrain_user74', 'EPNtrain_user75', 'EPNtrain_user76', 'EPNtrain_user77', 'EPNtrain_user78', 'EPNtrain_user79', 'EPNtrain_user8', 'EPNtrain_user80', 'EPNtrain_user81', 'EPNtrain_user82', 'EPNtrain_user83', 'EPNtrain_user84', 'EPNtrain_user85', 'EPNtrain_user86', 'EPNtrain_user87', 'EPNtrain_user88', 'EPNtrain_user89', 'EPNtrain_user9', 'EPNtrain_user90', 'EPNtrain_user91', 'EPNtrain_user92', 'EPNtrain_user93', 'EPNtrain_user94', 'EPNtrain_user95', 'EPNtrain_user96', 'EPNtrain_user97', 'EPNtrain_user98', 'EPNtrain_user99']
+  epoch 1: val accuracy 0.502
+  epoch 2: val accuracy 0.510
+  epoch 3: val accuracy 0.523
+  epoch 4: val accuracy 0.526
+  epoch 5: val accuracy 0.537
+ pre-training best validation accuracy 0.537
+Fold test=['S02'] val=S09 train=['S03', 'S04', 'S05', 'S06', 'S07', 'S08'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.432
+  epoch 2: val accuracy 0.429
+  epoch 3: val accuracy 0.449
+  epoch 4: val accuracy 0.425
+  epoch 5: val accuracy 0.445
+  epoch 6: val accuracy 0.442
+  epoch 7: val accuracy 0.422
+ Phase B: LoRA
+  epoch 1: val accuracy 0.439
+  epoch 2: val accuracy 0.415
+  epoch 3: val accuracy 0.442
+  epoch 4: val accuracy 0.455
+  epoch 5: val accuracy 0.449
+  epoch 6: val accuracy 0.445
+  epoch 7: val accuracy 0.468
+  epoch 8: val accuracy 0.455
+  epoch 9: val accuracy 0.478
+  epoch 10: val accuracy 0.458
+  epoch 11: val accuracy 0.468
+  epoch 12: val accuracy 0.492
+  epoch 13: val accuracy 0.485
+  epoch 14: val accuracy 0.488
+  epoch 15: val accuracy 0.498
+  linear_probe on S02: accuracy 0.352
+  lora on S02: accuracy 0.362
+  lora on SP01 (stroke patient): accuracy 0.608
+Fold test=['S03'] val=S09 train=['S02', 'S04', 'S05', 'S06', 'S07', 'S08'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.442
+  epoch 2: val accuracy 0.462
+  epoch 3: val accuracy 0.442
+  epoch 4: val accuracy 0.409
+  epoch 5: val accuracy 0.425
+  epoch 6: val accuracy 0.439
+ Phase B: LoRA
+  epoch 1: val accuracy 0.385
+  epoch 2: val accuracy 0.439
+  epoch 3: val accuracy 0.419
+  epoch 4: val accuracy 0.508
+  epoch 5: val accuracy 0.472
+  epoch 6: val accuracy 0.458
+  epoch 7: val accuracy 0.478
+  epoch 8: val accuracy 0.488
+  linear_probe on S03: accuracy 0.223
+  lora on S03: accuracy 0.269
+  lora on SP01 (stroke patient): accuracy 0.532
+Fold test=['S04'] val=S09 train=['S02', 'S03', 'S05', 'S06', 'S07', 'S08'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.455
+  epoch 2: val accuracy 0.392
+  epoch 3: val accuracy 0.495
+  epoch 4: val accuracy 0.468
+  epoch 5: val accuracy 0.402
+  epoch 6: val accuracy 0.455
+  epoch 7: val accuracy 0.425
+ Phase B: LoRA
+  epoch 1: val accuracy 0.475
+  epoch 2: val accuracy 0.512
+  epoch 3: val accuracy 0.545
+  epoch 4: val accuracy 0.551
+  epoch 5: val accuracy 0.555
+  epoch 6: val accuracy 0.525
+  epoch 7: val accuracy 0.518
+  epoch 8: val accuracy 0.525
+  epoch 9: val accuracy 0.555
+  linear_probe on S04: accuracy 0.483
+  lora on S04: accuracy 0.434
+  lora on SP01 (stroke patient): accuracy 0.578
+Fold test=['S05'] val=S09 train=['S02', 'S03', 'S04', 'S06', 'S07', 'S08'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.439
+  epoch 2: val accuracy 0.452
+  epoch 3: val accuracy 0.425
+  epoch 4: val accuracy 0.439
+  epoch 5: val accuracy 0.455
+  epoch 6: val accuracy 0.458
+  epoch 7: val accuracy 0.439
+  epoch 8: val accuracy 0.429
+  epoch 9: val accuracy 0.442
+  epoch 10: val accuracy 0.439
+ Phase B: LoRA
+  epoch 1: val accuracy 0.452
+  epoch 2: val accuracy 0.495
+  epoch 3: val accuracy 0.452
+  epoch 4: val accuracy 0.482
+  epoch 5: val accuracy 0.478
+  epoch 6: val accuracy 0.482
+  linear_probe on S05: accuracy 0.505
+  lora on S05: accuracy 0.495
+  lora on SP01 (stroke patient): accuracy 0.495
+Fold test=['S06'] val=S09 train=['S02', 'S03', 'S04', 'S05', 'S07', 'S08'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.422
+  epoch 2: val accuracy 0.452
+  epoch 3: val accuracy 0.442
+  epoch 4: val accuracy 0.432
+  epoch 5: val accuracy 0.442
+  epoch 6: val accuracy 0.455
+  epoch 7: val accuracy 0.439
+  epoch 8: val accuracy 0.442
+  epoch 9: val accuracy 0.439
+  epoch 10: val accuracy 0.442
+ Phase B: LoRA
+  epoch 1: val accuracy 0.439
+  epoch 2: val accuracy 0.468
+  epoch 3: val accuracy 0.458
+  epoch 4: val accuracy 0.472
+  epoch 5: val accuracy 0.482
+  epoch 6: val accuracy 0.478
+  epoch 7: val accuracy 0.482
+  epoch 8: val accuracy 0.488
+  epoch 9: val accuracy 0.482
+  epoch 10: val accuracy 0.468
+  epoch 11: val accuracy 0.492
+  epoch 12: val accuracy 0.478
+  epoch 13: val accuracy 0.492
+  epoch 14: val accuracy 0.478
+  epoch 15: val accuracy 0.482
+  linear_probe on S06: accuracy 0.449
+  lora on S06: accuracy 0.525
+  lora on SP01 (stroke patient): accuracy 0.545
+Fold test=['S07'] val=S09 train=['S02', 'S03', 'S04', 'S05', 'S06', 'S08'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.439
+  epoch 2: val accuracy 0.435
+  epoch 3: val accuracy 0.419
+  epoch 4: val accuracy 0.412
+  epoch 5: val accuracy 0.439
+ Phase B: LoRA
+  epoch 1: val accuracy 0.425
+  epoch 2: val accuracy 0.402
+  epoch 3: val accuracy 0.399
+  epoch 4: val accuracy 0.429
+  epoch 5: val accuracy 0.415
+  epoch 6: val accuracy 0.432
+  epoch 7: val accuracy 0.445
+  epoch 8: val accuracy 0.432
+  epoch 9: val accuracy 0.449
+  epoch 10: val accuracy 0.442
+  epoch 11: val accuracy 0.449
+  epoch 12: val accuracy 0.435
+  epoch 13: val accuracy 0.472
+  epoch 14: val accuracy 0.472
+  epoch 15: val accuracy 0.495
+  linear_probe on S07: accuracy 0.316
+  lora on S07: accuracy 0.492
+  lora on SP01 (stroke patient): accuracy 0.468
+Fold test=['S08'] val=S09 train=['S02', 'S03', 'S04', 'S05', 'S06', 'S07'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.429
+  epoch 2: val accuracy 0.449
+  epoch 3: val accuracy 0.425
+  epoch 4: val accuracy 0.412
+  epoch 5: val accuracy 0.442
+  epoch 6: val accuracy 0.425
+ Phase B: LoRA
+  epoch 1: val accuracy 0.429
+  epoch 2: val accuracy 0.442
+  epoch 3: val accuracy 0.475
+  epoch 4: val accuracy 0.482
+  epoch 5: val accuracy 0.472
+  epoch 6: val accuracy 0.482
+  epoch 7: val accuracy 0.472
+  epoch 8: val accuracy 0.495
+  epoch 9: val accuracy 0.478
+  epoch 10: val accuracy 0.482
+  epoch 11: val accuracy 0.465
+  epoch 12: val accuracy 0.449
+  linear_probe on S08: accuracy 0.485
+  lora on S08: accuracy 0.482
+  lora on SP01 (stroke patient): accuracy 0.615
+Fold test=['S09'] val=S08 train=['S02', 'S03', 'S04', 'S05', 'S06', 'S07'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.429
+  epoch 2: val accuracy 0.485
+  epoch 3: val accuracy 0.492
+  epoch 4: val accuracy 0.522
+  epoch 5: val accuracy 0.462
+  epoch 6: val accuracy 0.475
+  epoch 7: val accuracy 0.468
+  epoch 8: val accuracy 0.465
+ Phase B: LoRA
+  epoch 1: val accuracy 0.495
+  epoch 2: val accuracy 0.508
+  epoch 3: val accuracy 0.485
+  epoch 4: val accuracy 0.439
+  epoch 5: val accuracy 0.478
+  epoch 6: val accuracy 0.512
+  epoch 7: val accuracy 0.485
+  epoch 8: val accuracy 0.502
+  epoch 9: val accuracy 0.482
+  epoch 10: val accuracy 0.478
+  linear_probe on S09: accuracy 0.412
+  lora on S09: accuracy 0.512
+  lora on SP01 (stroke patient): accuracy 0.588
+                             accuracy  macro_f1
+phase        test                              
+linear_probe healthy           0.4030    0.3291
+lora         healthy           0.4463    0.4160
+             stroke patient    0.5536    0.5302

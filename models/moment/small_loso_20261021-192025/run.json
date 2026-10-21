@@ -1,0 +1,73 @@
+{
+  "run_id": "small_loso_20261021-192025",
+  "status": "completed",
+  "created": "2026-10-21T19:20:25+05:30",
+  "size": "small",
+  "base_model": "AutonLab/MOMENT-1-small",
+  "base_revision": "411e288267f82cce86296dbe4d6c8bc533cc162f",
+  "revin": false,
+  "labels": [
+    "Rest",
+    "Hand_Open",
+    "Hand_Close",
+    "Left",
+    "Right",
+    "Up",
+    "Down"
+  ],
+  "split": "loso",
+  "folds": [
+    "S02",
+    "S03",
+    "S04",
+    "S05",
+    "S06",
+    "S07",
+    "S08",
+    "S09"
+  ],
+  "seq_len": 512,
+  "args": {
+    "size": "small",
+    "split": "loso",
+    "data": "/Users/admin/Projects/Atheek FYP/FYP/data/processed/moment/windows.npz",
+    "revin": false,
+    "class_weights": false,
+    "probe_epochs": 15,
+    "lora_epochs": 15,
+    "lora_rank": 8,
+    "batch_size": 32,
+    "patience": 4,
+    "extra_data": null,
+    "pretrain_data": null,
+    "pretrain_epochs": 10,
+    "max_extra": null,
+    "max_pretrain": null,
+    "tag": ""
+  },
+  "environment": {
+    "python": "3.11.17",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "device": "mps",
+    "torch": "2.14.1",
+    "momentfm": "0.1.4",
+    "peft": "0.13.2",
+    "transformers": "4.33.3",
+    "numpy": "1.25.2",
+    "git_commit": "734bb78779f9703f5dd323382828262888445f60",
+    "git_dirty": true
+  },
+  "results": {
+    "linear_probe": {
+      "accuracy": 0.43,
+      "macro_f1": 0.369
+    },
+    "lora": {
+      "accuracy": 0.4592,
+      "macro_f1": 0.4174
+    },
+    "lora_stroke_patient": {
+      "accuracy": 0.4938
+    }
+  }
+}

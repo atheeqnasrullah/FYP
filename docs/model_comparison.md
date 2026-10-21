@@ -1,8 +1,10 @@
-# Model comparison: classical models and MOMENT-1 before and after fine-tuning
+# Model comparison: classical models, MOMENT-1 before and after fine-tuning, and public data
 
-On the same 8 volunteers and the same subject splits, the best EMG movement classifier is a **random forest on frozen (not fine-tuned) MOMENT-1 features: 48.1%** leave-one-subject-out accuracy over 7 movements (chance 14.3%). An SVM on hand-crafted features of the same 5.12 s windows is close behind (47.3%). Fine-tuned MOMENT-1 (LoRA) reaches 43.2%. The first headline comparison (fine-tuned MOMENT 43.2% vs SVM 37.4%) mostly measured window length (5.12 s vs 200 ms), not the model.
+On the same 8 volunteers and the same subject splits, the best EMG movement classifier is a **random forest on frozen (not fine-tuned) MOMENT-1 features: 48.1%** leave-one-subject-out accuracy over 7 movements (chance 14.3%). An SVM on hand-crafted features of the same 5.12 s windows is close behind (47.3%), and MOMENT-1 fine-tuned with LoRA reaches 45.9%. Adding public data (UCI, 36 people; EMG-EPN-612, 612 people) did not raise accuracy on our volunteers.
 
-Run on 2026-10-18 with `src/evaluation/compare_models.py`. Every fine-tuned model was reloaded from its saved files in `models/moment/` and reproduced its training score exactly.
+Results as of 2026-10-21, from `src/evaluation/compare_models.py` and `src/evaluation/public_data_gain.py`. Every fine-tuned model was reloaded from its saved files in `models/moment/` and reproduced its training score exactly.
+
+> **Correction (2026-10-21).** Fine-tuning results published before this date were wrong. MOMENT enables gradient checkpointing by default; with its encoder frozen, this blocked every gradient to the LoRA adapters, so only the classification head ever trained (the "LoRA" and "linear probe" scores were therefore almost identical, and public-data pre-training had no effect). The fix (`enable_gradient_checkpointing: False` in `build_model`) is in place, the smoke test now fails if the adapters do not change, and every fine-tuning run was repeated. Classical and frozen-feature results were not affected.
 
 ![Leave-one-subject-out accuracy of every model](figures/model_comparison.png)
 
@@ -11,7 +13,7 @@ Run on 2026-10-18 with `src/evaluation/compare_models.py`. Every fine-tuned mode
 | Item | Value |
 |---|---|
 | Data | `Dataset/Healthy_person`, 8 volunteers (S02-S09; S01 excluded for 39% lost samples), 7 movements: Rest, Hand_Open, Hand_Close, Left, Right, Up, Down |
-| Extra test | Stroke patient: the generated patient `SYN_STROKE_01` at the time of these runs (now replaced by `SP01`, see [datasets.md](datasets.md)); never trained on |
+| Extra test | Stroke patient `SP01` (origin to be confirmed, see [datasets.md](datasets.md)); never trained on |
 | Leave-one-subject-out (LOSO) | 8 folds; each tests one volunteer. Train on 6, the 7th is MOMENT's early-stopping subject (classical models skip it) |
 | Holdout | Train S02-S05, validation S06 (MOMENT only), test S07+S08+S09 (903 windows, 129 per movement) |
 | Splits | Read from the saved runs (`models/moment/*/folds/*/fold.json`), so every method sees exactly the same people |
@@ -37,45 +39,43 @@ Run on 2026-10-18 with `src/evaluation/compare_models.py`. Every fine-tuned mode
 | Classical, 200 ms | Random forest | 34.0% | 0.307 |
 | Classical, 5.12 s | LDA | 43.8% | 0.381 |
 | Classical, 5.12 s | SVM | 47.3% | 0.425 |
-| Classical, 5.12 s | Random forest | 40.3% | 0.368 |
+| Classical, 5.12 s | Random forest | 40.2% | 0.367 |
 | MOMENT before fine-tuning | Untrained head | 14.2% | 0.059 |
 | MOMENT before fine-tuning | Frozen + LDA (calibrated) | 41.9% | 0.392 |
 | MOMENT before fine-tuning | Frozen + SVM (calibrated) | 46.4% | 0.425 |
 | MOMENT before fine-tuning | **Frozen + random forest (calibrated)** | **48.1%** | **0.443** |
-| MOMENT before fine-tuning | Frozen + LDA (RevIN) | 31.4% | 0.289 |
+| MOMENT before fine-tuning | Frozen + LDA (RevIN) | 31.4% | 0.288 |
 | MOMENT before fine-tuning | Frozen + SVM (RevIN) | 35.0% | 0.313 |
 | MOMENT before fine-tuning | Frozen + random forest (RevIN) | 35.3% | 0.304 |
 | MOMENT after fine-tuning | Linear probe | 43.0% | 0.369 |
-| MOMENT after fine-tuning | LoRA | 43.2% | 0.369 |
+| MOMENT after fine-tuning | LoRA | 45.9% | 0.417 |
 
 ## Results: holdout (test S07, S08, S09)
 
 | Group | Method | Accuracy | Macro F1 |
 |---|---|---|---|
-| Classical, 200 ms | LDA / SVM / random forest | 36.0% / 40.5% / 37.5% | 0.310 / 0.365 / 0.361 |
+| Classical, 200 ms | LDA / SVM / random forest | 36.0% / 40.5% / 37.5% | 0.309 / 0.364 / 0.361 |
 | Classical, 5.12 s | LDA / **SVM** / random forest | 40.3% / **50.2%** / 45.0% | 0.337 / **0.453** / 0.440 |
 | MOMENT before fine-tuning | Untrained head | 17.4% | 0.082 |
 | MOMENT before fine-tuning | Frozen + LDA / SVM / random forest (calibrated) | 45.2% / 48.3% / 49.3% | 0.436 / 0.469 / 0.463 |
-| MOMENT before fine-tuning | Frozen + LDA / SVM / random forest (RevIN) | 27.4% / 31.8% / 29.2% | 0.252 / 0.294 / 0.262 |
-| MOMENT after fine-tuning | Linear probe / LoRA | 45.5% / 45.5% | 0.401 / 0.404 |
+| MOMENT before fine-tuning | Frozen + LDA / SVM / random forest (RevIN) | 27.4% / 31.8% / 29.2% | 0.252 / 0.293 / 0.262 |
+| MOMENT after fine-tuning | Linear probe / LoRA | 45.5% / 48.7% | 0.401 / 0.453 |
 
 The holdout has only three test volunteers, so LOSO (all 8) is the more reliable ranking.
 
-## Results: synthetic stroke patient
-
-Patient results in this table were computed on the earlier generated patient `SYN_STROKE_01`, which was replaced by `SP01` on 2026-10-18; re-run the evaluation to update them. Healthy-volunteer results are unaffected.
+## Results: stroke patient `SP01`
 
 Trained on healthy volunteers only; LOSO values are the mean of the 8 fold models.
 
 | Method | LOSO models | Holdout model |
 |---|---|---|
-| LDA / SVM / random forest, 200 ms | 26.0% / 27.5% / 37.4% | 22.5% / 30.6% / 36.5% |
-| LDA / SVM / random forest, 5.12 s | 28.3% / 47.3% / **51.5%** | 32.6% / 30.6% / 28.2% |
-| Frozen MOMENT + LDA / SVM / random forest (calibrated) | 45.5% / 48.9% / **52.2%** | 36.9% / 42.2% / **47.5%** |
-| Frozen MOMENT + LDA / SVM / random forest (RevIN) | 23.0% / 24.2% / 21.4% | 27.6% / 18.3% / 16.9% |
-| MOMENT LoRA (fine-tuned) | 43.4% | 35.9% |
+| LDA / SVM / random forest, 200 ms | 15.6% / 14.8% / 17.6% | 14.3% / 14.1% / 15.2% |
+| LDA / SVM / random forest, 5.12 s | 35.3% / 43.4% / 56.1% | 36.9% / 33.9% / 34.2% |
+| Frozen MOMENT + LDA / SVM / random forest (calibrated) | 61.8% / 65.8% / **67.5%** | 37.2% / 39.2% / **42.9%** |
+| Frozen MOMENT + LDA / SVM / random forest (RevIN) | 47.9% / 58.2% / 51.0% | 28.2% / 25.9% / 25.9% |
+| MOMENT LoRA (fine-tuned) | 49.4% | 34.9% |
 
-The patient is generated data, so these numbers only show robustness to a different signal style, not clinical performance.
+`SP01`'s signal is 5-8 times weaker than the healthy volunteers' and its origin is not documented, so these numbers show robustness to a very different signal, not clinical performance. The 200 ms models fail completely on it (chance level); per-subject calibration on 5.12 s windows is what makes transfer possible.
 
 ## Per movement (LOSO recall)
 
@@ -83,92 +83,86 @@ The patient is generated data, so these numbers only show robustness to a differ
 |---|---|---|---|---|---|---|---|
 | SVM, 200 ms | 81% | 46% | 66% | 23% | 9% | 19% | 11% |
 | SVM, 5.12 s | 74% | 59% | **79%** | **47%** | **40%** | 23% | 5% |
-| Frozen MOMENT + random forest | 78% | **74%** | 75% | 40% | 31% | 9% | **27%** |
-| MOMENT LoRA | 72% | **74%** | 76% | 32% | 18% | 19% | 3% |
+| Frozen MOMENT + random forest | **78%** | 74% | 75% | 40% | 31% | 9% | **27%** |
+| MOMENT LoRA | 65% | **82%** | 74% | 31% | 21% | 17% | 26% |
 
 ## Per volunteer (LOSO accuracy)
 
 | Volunteer | SVM, 200 ms | SVM, 5.12 s | Frozen MOMENT + RF | MOMENT LoRA |
 |---|---|---|---|---|
-| S02 | 24.9% | 36.9% | 40.9% | 35.9% |
-| S03 | 15.8% | 28.6% | 31.2% | 21.3% |
-| S04 | 35.0% | 56.1% | 49.9% | 50.6% |
-| S05 | 47.1% | 52.5% | 52.8% | 55.5% |
-| S06 | 40.3% | 56.5% | 58.5% | 43.5% |
-| S07 | 40.6% | 45.5% | 51.8% | 43.5% |
-| S08 | 49.7% | 55.8% | 49.8% | 50.8% |
+| S02 | 24.9% | 36.9% | 40.9% | 38.5% |
+| S03 | 15.8% | 28.6% | 31.2% | 26.2% |
+| S04 | 35.0% | 56.1% | 49.9% | 51.4% |
+| S05 | 47.1% | 52.5% | 52.8% | 54.2% |
+| S06 | 40.3% | 56.5% | 58.5% | 53.8% |
+| S07 | 40.6% | 45.5% | 51.8% | 46.5% |
+| S08 | 49.7% | 55.8% | 49.8% | 52.2% |
 | S09 | 44.4% | 46.8% | 50.2% | 44.5% |
 
 ## Findings
 
 1. **Window length matters most.** Moving the same SVM from 200 ms to 5.12 s windows raises LOSO accuracy from 37.2% to 47.3% (+10.1 points). Longer windows capture how activity changes during a movement.
-2. **Pretrained MOMENT features help without any fine-tuning.** Frozen MOMENT embeddings with a random forest give the best LOSO result (48.1%) and the best synthetic-patient result (52.2%).
-3. **Fine-tuning as configured did not beat frozen features.** The fine-tuned model's linear head (43.0-43.2%) is weaker than non-linear classifiers on the same frozen features (46.4-48.1%); LoRA added only 0.2 points over the linear probe. With about 1,900 training windows from 6 people, the adapters have little to learn from.
+2. **Pretrained MOMENT features help without any fine-tuning.** Frozen MOMENT embeddings with a random forest give the best LOSO result (48.1%) and the best patient result (67.5%).
+3. **LoRA fine-tuning helps MOMENT but does not overtake frozen features.** Real LoRA training adds 2.9 points over the linear probe (45.9% vs 43.0% LOSO; 48.7% vs 45.5% holdout) and gives the best Hand_Open recall (82%), yet stays 2.2 points below frozen features + random forest. With about 1,900 training windows from 6 people, a non-linear classifier on fixed features generalises slightly better than adapting the encoder.
 4. **Per-subject calibration is essential.** MOMENT's own per-window normalisation (RevIN) erases activity level and costs 11-13 points (35.3% vs 48.1% for the random forest).
 5. **The untouched model is at chance** (14.2%): MOMENT must be adapted, at least with a trained classifier on its features.
 6. **Hand gestures are learnable, directions are not.** Every method recognises Rest, Hand_Open and Hand_Close far better than Left, Right, Up and Down. One forearm channel carries little direction information, so the camera must keep deciding direction.
 7. **Volunteers differ a lot.** S03 is hardest for every method (16-31%); S05 and S06 are easiest. With 8 people, differences of 1-2 points between the top methods are within this spread and should not be over-interpreted.
 
-## What this means for the application
+## Public data (UCI and EMG-EPN-612)
 
-- Keep the camera in charge of movement labels; EMG can help with hand open/close and activity feedback.
-- For an EMG classifier, use 5.12 s windows with per-subject calibration, and either frozen MOMENT features + random forest or an SVM on window features.
-- Next improvements: more volunteers recorded with our own sensor (public data did not help; see below), the missing S01 and S04 recordings, a second EMG channel for directions, a non-linear head or longer training for fine-tuning, and a short per-patient calibration recording.
+Two public datasets were converted to MD0437-like windows (see [datasets.md](datasets.md#public-data)) and used in three ways, always testing on our own volunteers with the same 8 LOSO folds:
 
-## Public data (UCI)
+- **Public windows added:** public windows whose labels match ours (Rest, Hand_Close, Hand_Open) join every training fold (UCI: all 2,120; EMG-EPN-612: a label-balanced sample of 3,000 of 68,850).
+- **Pre-trained on public:** MOMENT's LoRA adapters first learn all public gestures (UCI: 6,288 windows, 7 gestures; EMG-EPN-612: a label-balanced 60,000 of 137,700 windows, 6 gestures), then are fine-tuned on our data with a new head.
+- **Features after public pre-training:** the pre-trained encoder is frozen and an SVM or random forest is trained on its features.
 
-Adding the public [UCI EMG Data for Gestures](https://archive.ics.uci.edu/dataset/481/emg+data+for+gestures) dataset (36 people, converted to MD0437-like windows, see [datasets.md](datasets.md#public-data-uci-emg-data-for-gestures)) **did not raise the best accuracy**. Only pre-training MOMENT on it gave a small gain, and the best model is still frozen MOMENT features + random forest on our data alone (48.1%).
+Held-out accuracy of the pre-training itself (public people not trained on): UCI 36.2% over 7 gestures, EMG-EPN-612 53.7% over 6 gestures.
 
-![Effect of adding public UCI data](figures/public_data_gain.png)
+| Method | Own data only | + UCI | + EMG-EPN-612 |
+|---|---|---|---|
+| SVM, 5.12 s window features (public windows added) | **47.3%** | 43.2% | 44.3% |
+| Random forest, 5.12 s window features (public windows added) | 40.3% | 43.4% | 44.4% |
+| SVM, frozen MOMENT features (public windows added) | 46.4% | 47.2% | 47.2% |
+| Random forest, frozen MOMENT features (public windows added) | **48.1%** | 47.8% | 47.5% |
+| SVM, features of the public-pre-trained encoder | 46.4% | 44.1% | 45.9% |
+| SVM, public-pre-trained encoder + public windows added | 46.4% | 45.2% | 47.9% |
+| Random forest, features of the public-pre-trained encoder | 48.1% | 45.2% | 45.3% |
+| Random forest, public-pre-trained encoder + public windows added | 48.1% | 45.7% | 46.2% |
+| MOMENT LoRA, pre-trained on public | 45.9% | 45.0% | 44.6% |
+| MOMENT LoRA, public windows added | 45.9% | not re-run | 45.4% |
 
-Two ways of using the public data were tested, always testing on our own volunteers with the same 8 LOSO folds:
-
-- **Public windows added:** the 2,120 public windows whose labels match ours (Rest, Hand_Close, Hand_Open) join every training fold.
-- **Pre-trained on public:** MOMENT's LoRA adapters first learn all 7 UCI gestures from all 6,288 public windows (best validation accuracy on 5 held-out UCI people: 36.3%), then are fine-tuned on our data with a new head.
-
-| Method | Own data only | Public windows added | Pre-trained on public | Pre-trained + windows added |
-|---|---|---|---|---|
-| SVM, 5.12 s window features | **47.3%** | 43.1% (-4.2) | - | - |
-| Random forest, 5.12 s window features | 40.3% | 43.4% (+3.2) | - | - |
-| SVM, frozen MOMENT features | 46.4% | 47.2% (+0.8) | - | - |
-| Random forest, frozen MOMENT features | **48.1%** | 47.8% (-0.4) | - | - |
-| MOMENT LoRA fine-tuned | 43.2% | 39.1% (-4.1) | **44.4% (+1.2)** | 41.1% (-2.1) |
+![Effect of EMG-EPN-612](figures/epn612_data_gain.png)
 
 Fine-tuned MOMENT per volunteer (LOSO accuracy):
 
-| Volunteer | Own data only | Public windows added | Pre-trained on public | Both |
+| Volunteer | Own data only | Pre-trained on UCI | Pre-trained on EMG-EPN-612 | EMG-EPN-612 windows added |
 |---|---|---|---|---|
-| S02 | 35.9% | 17.9% | 35.5% | 30.6% |
-| S03 | 21.3% | 15.0% | **32.9%** | 13.6% |
-| S04 | 50.6% | 50.4% | 53.0% | 49.6% |
-| S05 | 55.5% | 52.2% | 50.8% | 57.5% |
-| S06 | 43.5% | 43.2% | 43.2% | 42.5% |
-| S07 | 43.5% | 43.9% | 44.2% | 42.5% |
-| S08 | 50.8% | 47.8% | 51.2% | 48.8% |
-| S09 | 44.5% | 42.9% | 44.5% | 43.5% |
-| Synthetic patient `SYN_STROKE_01` (mean of 8 models) | 43.4% | 42.4% | 42.2% | 42.8% |
+| S02 | 38.5% | 30.9% | 36.2% | 36.9% |
+| S03 | 26.2% | 24.6% | 26.9% | 23.6% |
+| S04 | 51.4% | 46.0% | 43.4% | 56.6% |
+| S05 | 54.2% | 53.2% | 49.5% | 56.8% |
+| S06 | 53.8% | 53.2% | 52.5% | 50.5% |
+| S07 | 46.5% | 50.5% | 49.2% | 44.2% |
+| S08 | 52.2% | 53.8% | 48.2% | 49.5% |
+| S09 | 44.5% | 48.2% | 51.2% | 45.2% |
+| **Mean** | **45.9%** | 45.0% | 44.6% | 45.4% |
+| Stroke patient `SP01` (mean of 8 models) | 49.4% | 53.9% | **55.4%** | 47.2% |
 
-Why the public data helped so little:
+Why the public data did not help our volunteers:
 
-1. **Different sensor.** UCI was recorded with a raw 8-channel armband; the conversion to an MD0437-like envelope is only an approximation, and we do not know which armband channel matches our electrode site.
-2. **Different recordings.** UCI gestures last about 1.8 s; our windows are 5.12 s, so public windows are mostly padding.
-3. **Only 3 shared movements.** Adding public windows for Rest, Hand_Open and Hand_Close tilts training toward those classes, which hurt S02 and S03 in particular (S02 fell from 35.9% to 17.9%).
-4. **Pre-training is the safer use.** It does not change our class balance; it gave +1.2 points on average, mostly from S03 (+11.6), while other volunteers moved by less than 5 points either way. With 8 volunteers this is within normal variation, so it is a hint, not proof.
+1. **Different sensor.** Both datasets come from a raw 8-channel Myo armband; the conversion to an MD0437-like envelope is an approximation, and we do not know which armband channel matches our electrode site.
+2. **Different recordings.** Public gestures are short (UCI about 1.8 s; EMG-EPN-612 about 1 s of gesture inside a 5 s recording), while our volunteers hold each movement for 60 s.
+3. **Only 3 shared movements.** Directions (Left/Right/Up/Down) have no public equivalent, and adding Rest/Hand_Open/Hand_Close windows tilts training toward those classes.
+4. **Pre-training learns the public data well but transfers poorly.** EMG-EPN-612 pre-training reached 53.7% on its own held-out people, yet the adapted encoder made our volunteers slightly worse (44.6% vs 45.9%). It did help the stroke patient (55.4% vs 49.4%), whose signal is also unlike our healthy volunteers'.
 
-**Conclusion:** public armband data is not a substitute for recordings from our own sensor. The most reliable way to raise accuracy is more volunteers recorded with the MD0437 setup (and the missing S01 and S04 recordings), and, for direction movements, a second EMG channel.
+**Conclusion:** public armband data is not a substitute for recordings from our own sensor. The most reliable ways to raise accuracy are more volunteers recorded with the MD0437 setup, the missing S01 and S04 recordings, and, for direction movements, a second EMG channel.
 
-Reproduce:
+## What this means for the application
 
-```bash
-.venv/bin/python -m src.data.download_public                      # UCI, 17 MB
-.venv/bin/python -m src.data.public_emg uci_gestures
-U=data/processed/public/uci_gestures_windows.npz
-.venv-finetune/bin/python -m src.models.finetune_moment --split loso --extra-data $U --tag uci_extra
-.venv-finetune/bin/python -m src.models.finetune_moment --split loso --pretrain-data $U --tag uci_pretrain
-.venv-finetune/bin/python -m src.models.finetune_moment --split loso --pretrain-data $U --extra-data $U --tag uci_pretrain_extra
-.venv-finetune/bin/python -m src.evaluation.public_data_gain --loso-run models/moment/small_loso_20261018-134916 \
-    --public $U --finetuned models/moment/small_loso_*
-```
+- Keep the camera in charge of movement labels; EMG can help with hand open/close and activity feedback.
+- For an EMG classifier, use 5.12 s windows with per-subject calibration, and frozen MOMENT features + random forest (or an SVM on window features, or LoRA-fine-tuned MOMENT for the best Hand_Open recall).
+- Next improvements: more volunteers recorded with our own sensor, the missing S01 and S04 recordings, a second EMG channel for directions, and a short per-patient calibration recording.
 
 ## Reproduce
 
@@ -178,8 +172,23 @@ U=data/processed/public/uci_gestures_windows.npz
 .venv-finetune/bin/python -m src.models.finetune_moment --split holdout
 .venv-finetune/bin/python -m src.models.finetune_moment --split loso
 .venv-finetune/bin/python -m src.evaluation.compare_models \
-    --holdout-run models/moment/small_holdout_20261018-134750 \
-    --loso-run models/moment/small_loso_20261018-134916                  # about 20 min
+    --holdout-run models/moment/small_holdout_20261021-191854 \
+    --loso-run models/moment/small_loso_20261021-192025                  # about 10 min
+
+# Public data
+.venv/bin/python -m src.data.download_public uci_gestures epn612         # 17 MB + 5.5 GB
+.venv/bin/python -m src.data.public_emg uci_gestures
+.venv/bin/python -m src.data.public_emg epn612                           # 137,700 windows, about 3 min
+U=data/processed/public/uci_gestures_windows.npz; E=data/processed/public/epn612_windows.npz
+.venv-finetune/bin/python -m src.models.finetune_moment --split loso --pretrain-data $U --tag uci_pretrain
+.venv-finetune/bin/python -m src.models.finetune_moment --split loso --pretrain-data $E --max-pretrain 60000 --pretrain-epochs 5 --tag epn_pretrain
+.venv-finetune/bin/python -m src.models.finetune_moment --split loso --extra-data $E --max-extra 3000 --tag epn_extra
+.venv-finetune/bin/python -m src.evaluation.public_data_gain --name epn612 --loso-run models/moment/small_loso_20261021-192025 \
+    --public $E --max-extra 3000 --encoder models/moment/small_loso_epn_pretrain_20261021-193241/pretrain \
+    --finetuned models/moment/small_loso_20261021-192025 models/moment/small_loso_epn_pretrain_20261021-193241 models/moment/small_loso_epn_extra_20261021-210209
+.venv-finetune/bin/python -m src.evaluation.public_data_gain --name public --loso-run models/moment/small_loso_20261021-192025 \
+    --public $U --encoder models/moment/small_loso_uci_pretrain_20261021-201317/pretrain \
+    --finetuned models/moment/small_loso_20261021-192025 models/moment/small_loso_uci_pretrain_20261021-201317
 ```
 
-Outputs: `results/tables/model_comparison.csv` (every fold), `model_comparison_summary.csv`, `model_comparison_recall.csv`, and `docs/figures/model_comparison.png`.
+Outputs: `results/tables/model_comparison*.csv`, `public_data_gain*.csv` (UCI), `epn612_data_gain*.csv`, and `docs/figures/model_comparison.png`, `public_data_gain.png`, `epn612_data_gain.png`.

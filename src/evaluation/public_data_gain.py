@@ -57,6 +57,16 @@ def run(features, extra_features, data, extra, folds, labels, name, rows, recall
             print(f"  {model_name}, {name}, public data {with_public}: LOSO accuracy {mean:.3f}", flush=True)
 
 
+def pretrained_encoder(pretrain_dir, device):
+    """MOMENT with the LoRA adapters learned on public data (from a run's pretrain/ folder), for frozen features."""
+    from peft import PeftModel
+    from src.models.finetune_moment import _dict_like_config
+    public_labels = json.loads((pretrain_dir / "labels.json").read_text())
+    base = build_model("small", len(public_labels), device, revin=False); _dict_like_config(base)
+    model = PeftModel.from_pretrained(base, pretrain_dir).to(device); model.eval()
+    return model.get_base_model()
+
+
 def finetuned_rows(run_dirs, rows):
     for run_dir in run_dirs:
         run_dir = ROOT / run_dir if not Path(run_dir).is_absolute() else Path(run_dir)
@@ -69,7 +79,7 @@ def finetuned_rows(run_dirs, rows):
                          "fold": r.fold, "accuracy": r.accuracy, "macro_f1": r.macro_f1})
 
 
-def plot(table, dest):
+def plot(table, dest, name="public"):
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     summary = table.groupby(["method", "variant"], sort=False).accuracy.mean().reset_index()
@@ -82,7 +92,8 @@ def plot(table, dest):
     ax.set_yticks(y, labels, fontsize=8); ax.set_xlim(0, max(60, summary.accuracy.max() * 100 + 8))
     ax.axvline(100 / 7, color="#c0392b", linestyle="--", linewidth=1)
     ax.set_xlabel("Leave-one-subject-out accuracy on our 8 volunteers (%)")
-    ax.set_title("Effect of adding public UCI EMG data\n(grey: own data only, blue: with public data)", fontsize=11)
+    title = {"public": "UCI", "uci_gestures": "UCI", "epn612": "EMG-EPN-612"}.get(name, name)
+    ax.set_title(f"Effect of adding public {title} EMG data\n(grey: own data only, blue: with public data)", fontsize=11)
     fig.tight_layout(); dest.parent.mkdir(parents=True, exist_ok=True); fig.savefig(dest, dpi=150); plt.close(fig)
 
 
@@ -91,27 +102,37 @@ def main(argv=None):
     parser.add_argument("--loso-run", required=True, help="saved LOSO run whose folds are used")
     parser.add_argument("--public", required=True, help="windows.npz from src.data.public_emg")
     parser.add_argument("--finetuned", nargs="*", default=[], help="fine-tuned run folders to include")
+    parser.add_argument("--max-extra", type=int, default=6000, help="cap on public windows added (label-balanced sample)")
+    parser.add_argument("--encoder", help="pretrain/ folder of a run: also test frozen features from the public-pre-trained encoder")
+    parser.add_argument("--name", default="public", help="short name of the public dataset for the result files")
     args = parser.parse_args(argv)
     import torch
     torch.manual_seed(42); np.random.seed(42)
     device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
     data, _, labels = load_windows(DATA)
-    extra, shared = load_public(args.public, labels)
+    extra, shared = load_public(args.public, labels, args.max_extra)
     folds = read_folds(ROOT / args.loso_run)
     print(f"{len(extra['y'])} public windows with shared labels {shared}; {len(folds)} folds", flush=True)
     rows, recalls = [], []
     run(window_features(data["X"], data["mask"]), window_features(extra["X"], extra["mask"]), data, extra, folds, labels, "5.12 s window features", rows, recalls)
     model = build_model("small", len(labels), device, revin=False); model.eval()
     run(embeddings(model, data["X"], data["mask"], device), embeddings(model, extra["X"], extra["mask"], device), data, extra, folds, labels, "frozen MOMENT features", rows, recalls)
-    for r in rows: r.setdefault("variant", "public windows added" if r["public_data"] else "own data only")
+    if args.encoder:
+        encoder = pretrained_encoder(ROOT / args.encoder if not Path(args.encoder).is_absolute() else Path(args.encoder), device)
+        run(embeddings(encoder, data["X"], data["mask"], device), embeddings(encoder, extra["X"], extra["mask"], device), data, extra, folds, labels,
+            "MOMENT features after public pre-training", rows, recalls)
+    for r in rows:
+        if "after public pre-training" in r["method"]:
+            r["variant"] = "pre-trained encoder" + (" + public windows added" if r["public_data"] else ""); r["public_data"] = True
+        r.setdefault("variant", "public windows added" if r["public_data"] else "own data only")
     finetuned_rows(args.finetuned, rows)
     table = pd.DataFrame(rows)
     tables = ROOT / "results/tables"; tables.mkdir(parents=True, exist_ok=True)
-    table.to_csv(tables / "public_data_gain.csv", index=False)
-    pd.DataFrame(recalls).to_csv(tables / "public_data_gain_recall.csv", index=False)
+    table.to_csv(tables / f"{args.name}_data_gain.csv", index=False)
+    pd.DataFrame(recalls).to_csv(tables / f"{args.name}_data_gain_recall.csv", index=False)
     summary = table.groupby(["method", "variant"], sort=False)[["accuracy", "macro_f1"]].mean().round(4)
     print(summary.to_string())
-    plot(table, ROOT / "docs/figures/public_data_gain.png")
-    print("Saved results/tables/public_data_gain*.csv and docs/figures/public_data_gain.png")
+    plot(table, ROOT / f"docs/figures/{args.name}_data_gain.png", args.name)
+    print(f"Saved results/tables/{args.name}_data_gain*.csv and docs/figures/{args.name}_data_gain.png")
 
 if __name__ == "__main__": main()

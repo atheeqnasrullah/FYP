@@ -14,9 +14,9 @@ Checked against the code and data on 2026-10-18 (branch `main`). Issues are thin
 | 6 | Latency, webcam gesture accuracy and usability have not been measured | No evidence yet for the 300 ms and SUS > 68 targets | See [testing_and_evaluation.md](testing_and_evaluation.md) |
 | 7 | No front-end tests for RehabHub | Web regressions are found by hand | Add component tests (for example Vitest) |
 | 8 | `npm run lint` reports 4 `react-refresh/only-export-components` warnings | Only affects hot reload in development | Move shared helpers out of component files |
-| 9 | The patient file changed from the generated `SYN_STROKE_01` to `SP01` on 2026-10-18; its origin (real or generated) is not documented | Patient-test numbers in the docs and saved runs refer to `SYN_STROKE_01` | Confirm `SP01`'s origin; re-run `compare_models` and fine-tuning to update the patient results |
+| 9 | The patient file changed from the generated `SYN_STROKE_01` to `SP01` on 2026-10-18; its origin (real or generated) is not documented | Patient results (now computed on `SP01`) cannot be called clinical | Confirm and document `SP01`'s origin |
 
-## Fixed on 2026-10-18
+## Fixed (2026-10-18 to 2026-10-21)
 
 | Issue | Fix |
 |---|---|
@@ -25,6 +25,7 @@ Checked against the code and data on 2026-10-18 (branch `main`). Issues are thin
 | Window sizes assumed 1 kHz for dataset files | Dataset rows carry `fs` = 100, used by the feature builder, replay and fine-tuning |
 | Web Game Launcher had no EMG replay mode | "Webcam + EMG replay (no sensor)" added to every game |
 | Classifier results came from the deleted data | Baselines re-run on `Dataset/` (SVM 36.7% leave-one-subject-out) |
+| LoRA adapters never trained (2026-10-21): MOMENT's default gradient checkpointing blocked all gradients to them, so earlier "fine-tuned" results were head-only | `enable_gradient_checkpointing: False` in `build_model`; the smoke test fails if the adapters do not change; all fine-tuning runs repeated |
 
 ## Limitations
 

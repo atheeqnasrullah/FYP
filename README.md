@@ -47,10 +47,10 @@ If port 8000 is taken, use another port and set `backend_url` in `config/setting
 |---|---|
 | Frozen MOMENT-1 features + random forest | **48.1%** |
 | SVM on 5.12 s window features | 47.3% |
-| MOMENT-1-small fine-tuned (LoRA) | 43.2% (44.4% when pre-trained on public UCI data) |
+| MOMENT-1-small fine-tuned (LoRA) | 45.9% (48.7% on the S07-S09 holdout) |
 | SVM on 200 ms window features | 37.2% |
 
-Rest, Hand_Open and Hand_Close are recognised well from EMG; Left, Right, Up and Down are near chance with one forearm channel, so the camera keeps control of movement. Public data (UCI) gave no reliable gain. See [docs/model_comparison.md](docs/model_comparison.md).
+Rest, Hand_Open and Hand_Close are recognised well from EMG; Left, Right, Up and Down are near chance with one forearm channel, so the camera keeps control of movement. Public data (UCI, 36 people; EMG-EPN-612, 612 people) did not improve accuracy on our volunteers. See [docs/model_comparison.md](docs/model_comparison.md).
 
 ## Repository map
 
@@ -72,4 +72,4 @@ docs/              documentation                 tests/      47 pytest tests
 
 ## Credits
 
-Public data: UCI "EMG Data for Gestures" (Lobov et al., *Sensors* 2018), CC BY 4.0. Base model: [AutonLab/MOMENT-1-small](https://huggingface.co/AutonLab/MOMENT-1-small), MIT licence. Team: M.N.M. Atheeq, A.F.M. Imzaan; supervisors Ms. Dulashi Pabasara and Mr. Vihanga Herath.
+Public data: UCI "EMG Data for Gestures" (Lobov et al., *Sensors* 2018) and EMG-EPN-612 (Escuela Politécnica Nacional, Zenodo 10.5281/zenodo.4421500), both CC BY 4.0. Base model: [AutonLab/MOMENT-1-small](https://huggingface.co/AutonLab/MOMENT-1-small), MIT licence. Team: M.N.M. Atheeq, A.F.M. Imzaan; supervisors Ms. Dulashi Pabasara and Mr. Vihanga Herath.

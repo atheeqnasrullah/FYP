@@ -51,17 +51,23 @@ def load_windows(path=DATA):
     return split(healthy), split(~healthy), labels
 
 
-def load_public(path, labels=None):
-    """Public windows from src.data.public_emg. With labels, keep only shared labels, re-indexed to ours."""
+def load_public(path, labels=None, max_windows=None, seed=0):
+    """Public windows from src.data.public_emg. With labels, keep only shared labels, re-indexed to ours.
+
+    max_windows: keep at most this many, sampled evenly across labels (seeded, reproducible)."""
     d = np.load(path, allow_pickle=False)
     public_labels = [str(v) for v in d["labels"]]
     part = {k: d[k] for k in ("X", "mask", "y", "subject")}
-    if labels is None: return part, public_labels
-    names = np.array(public_labels)[part["y"]]
-    keep = np.isin(names, labels)
-    part = {k: v[keep] for k, v in part.items()}
-    part["y"] = np.array([labels.index(n) for n in names[keep]], dtype=np.int64)
-    return part, [l for l in labels if l in public_labels]
+    if labels is not None:
+        names = np.array(public_labels)[part["y"]]
+        keep = np.isin(names, labels)
+        part = {k: v[keep] for k, v in part.items()}
+        part["y"] = np.array([labels.index(n) for n in names[keep]], dtype=np.int64)
+    if max_windows and len(part["y"]) > max_windows:
+        rng = np.random.default_rng(seed); classes = np.unique(part["y"]); per = max_windows // len(classes)
+        pick = np.concatenate([rng.permutation(np.flatnonzero(part["y"] == c))[:per] for c in classes])
+        part = {k: v[np.sort(pick)] for k, v in part.items()}
+    return part, (public_labels if labels is None else [l for l in labels if l in public_labels])
 
 
 def class_weights(path=DATA):
@@ -82,7 +88,11 @@ def build_model(size, n_classes, device, revin=False):
     from momentfm import MOMENTPipeline
     model = MOMENTPipeline.from_pretrained(MODEL_IDS[size], revision=MODEL_REVISIONS.get(size), model_kwargs={
         "task_name": "classification", "n_channels": 1, "num_class": n_classes,
-        "freeze_encoder": True, "freeze_embedder": True, "freeze_head": False, "reduction": "mean"})
+        "freeze_encoder": True, "freeze_embedder": True, "freeze_head": False, "reduction": "mean",
+        # MOMENT turns on gradient checkpointing by default. With a frozen encoder its inputs
+        # need no gradient, so checkpointing blocks every gradient to the LoRA adapters and
+        # they never train. The small model fits in memory without it.
+        "enable_gradient_checkpointing": False})
     model.init()
     if not revin:
         class KeepLevel(torch.nn.Module):
@@ -159,6 +169,12 @@ def smoke_test(args, data, n_classes, device):
         loss = torch.nn.functional.cross_entropy(logits, yb); loss.backward(); opt.step()
         trainable = sum(p.numel() for p in params); total = sum(p.numel() for p in model.parameters())
         print(f"{phase}: logits {tuple(logits.shape)}, loss {loss.item():.3f}, trainable {trainable:,} of {total:,} parameters on {device}")
+        if phase == "LoRA":
+            # LoRA B starts at zero; after one step it must have moved, or the adapters cannot learn
+            # (this caught MOMENT's default gradient checkpointing blocking all LoRA gradients).
+            moved = sum(float(p.detach().abs().sum()) for n, p in model.named_parameters() if "lora_B" in n)
+            print(f"LoRA adapters after one step: |B| = {moved:.2e}")
+            if moved == 0: raise SystemExit("LoRA adapters received no gradient; fine-tuning would only train the head")
     import tempfile
     model.eval()
     with torch.no_grad(): expected = model(x_enc=xb, input_mask=mb).logits.cpu()
@@ -199,6 +215,8 @@ def main(argv=None):
     parser.add_argument("--extra-data", help="public windows (src.data.public_emg) added to every training fold, shared labels only")
     parser.add_argument("--pretrain-data", help="public windows used to pre-train the LoRA adapters on their own labels first")
     parser.add_argument("--pretrain-epochs", type=int, default=10)
+    parser.add_argument("--max-extra", type=int, help="cap on public windows added to training (label-balanced sample)")
+    parser.add_argument("--max-pretrain", type=int, help="cap on public windows used for pre-training (label-balanced sample)")
     parser.add_argument("--tag", default="", help="short name added to the run folder, e.g. uci_extra")
     args = parser.parse_args(argv)
     data, synthetic, labels = load_windows(args.data)
@@ -229,7 +247,7 @@ def main(argv=None):
         return DataLoader(TensorDataset(*tensors), batch_size=args.batch_size, shuffle=shuffle)
     extra = None
     if args.extra_data:
-        extra, shared = load_public(args.extra_data, labels)
+        extra, shared = load_public(args.extra_data, labels, args.max_extra)
         print(f"Extra training data: {len(extra['y'])} public windows ({', '.join(shared)}) added to every training fold")
     lora_state = pretrain(args, device, loader, run_dir) if args.pretrain_data else None
     every_synthetic = np.ones(len(synthetic["y"]), bool)
@@ -292,7 +310,7 @@ def set_lora_trainable(model, trainable):
 
 def pretrain(args, device, loader, run_dir):
     """Train LoRA adapters + a temporary head on all public labels; return the adapter weights."""
-    part, public_labels = load_public(args.pretrain_data)
+    part, public_labels = load_public(args.pretrain_data, max_windows=args.max_pretrain)
     subjects = sorted(set(part["subject"])); val_subjects = subjects[-max(1, len(subjects) // 7):]
     val = np.isin(part["subject"], val_subjects)
     print(f"Pre-training on {len(part['y'])} public windows, {len(public_labels)} labels {public_labels}; "

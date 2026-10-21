@@ -1,0 +1,4 @@
+model,phase,split,fold,test,accuracy,macro_f1,n_test,minutes
+MOMENT-1-small,linear_probe,holdout,S07+S08+S09,S07+S08+S09,0.45514950166112955,0.4008957863583053,903,1.5
+MOMENT-1-small,lora,holdout,S07+S08+S09,S07+S08+S09,0.48726467331118495,0.45337308500604034,903,1.5
+MOMENT-1-small,lora,holdout,S07+S08+S09,SP01 (stroke patient),0.3488372093023256,0.2817099295139604,301,1.5

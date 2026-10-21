@@ -5,14 +5,13 @@ Files go to Dataset/public/<name>/ (ignored by git: EMG-EPN-612 alone is
 published MD5 where one exists. Archives are only unpacked, never executed.
 
   python -m src.data.download_public                 # UCI only (the dataset used)
-  python -m src.data.download_public epn612          # optional, 5.5 GB, not used so far
+  python -m src.data.download_public epn612          # EMG-EPN-612, 5.5 GB (8 parallel connections)
 
 Sources and licences:
   uci_gestures  UCI "EMG Data for Gestures", 36 people, Myo armband 8 ch,
                 CC BY 4.0, https://archive.ics.uci.edu/dataset/481
   epn612        EMG-EPN-612 v2.1, 612 people, Myo armband 8 ch, CC BY 4.0,
-                https://doi.org/10.5281/zenodo.4421500 (optional; the
-                download was stopped and the project does not use it)
+                https://doi.org/10.5281/zenodo.4421500
 """
 import argparse, hashlib, subprocess, sys, zipfile
 from pathlib import Path
@@ -44,14 +43,46 @@ def safe_extract(archive, dest):
         z.extractall(dest)
 
 
-def download(name):
+def fetch_parallel(url, archive, size, parts):
+    """Download in `parts` byte ranges at once (servers often limit speed per connection).
+
+    Each range is a separate .partN file that resumes where it stopped; when all are
+    complete they are joined into the archive."""
+    import time
+    bounds = [(i * size // parts, (i + 1) * size // parts - 1) for i in range(parts)]
+    files = [archive.with_name(f"{archive.name}.part{i}") for i in range(parts)]
+    for attempt in range(1, 31):
+        procs = []
+        for (a, b), f in zip(bounds, files):
+            have = f.stat().st_size if f.exists() else 0
+            if have >= b - a + 1: continue
+            out = open(f, "ab")
+            procs.append((subprocess.Popen(["curl", "-sS", "-L", "--fail", "-r", f"{a + have}-{b}", url], stdout=out), out))
+        if not procs: break
+        while any(p.poll() is None for p, _ in procs):
+            done = sum(f.stat().st_size for f in files if f.exists())
+            print(f"  {done / 1e9:.2f} / {size / 1e9:.2f} GB", flush=True); time.sleep(30)
+        for _, out in procs: out.close()
+    else:
+        raise SystemExit("download did not complete after 30 attempts")
+    with open(archive, "wb") as joined:
+        for f in files:
+            with open(f, "rb") as part:
+                while block := part.read(1 << 24): joined.write(block)
+    for f in files: f.unlink()
+
+
+def download(name, parallel=1):
     spec = DATASETS[name]; folder = PUBLIC_DIR / name; folder.mkdir(parents=True, exist_ok=True)
     archive = folder / spec["file"]; done = folder / ".extracted"
     if done.exists():
         print(f"{name}: already downloaded and extracted in {folder.relative_to(ROOT)}"); return
     print(f"{name}: downloading {spec['url']}", flush=True)
+    if parallel > 1 and spec.get("size"):
+        fetch_parallel(spec["url"], archive, spec["size"], parallel)
     # Large files: servers sometimes close long transfers, so resume (-C -) until complete.
     for attempt in range(1, 31):
+        if archive.exists() and spec.get("size") and archive.stat().st_size >= spec["size"]: break
         result = subprocess.run(["curl", "-L", "--fail", "--retry", "10", "--retry-delay", "5", "-C", "-", "-o", str(archive), spec["url"]])
         size = archive.stat().st_size if archive.exists() else 0
         if result.returncode == 0 and (spec.get("size") is None or size >= spec["size"]): break
@@ -72,7 +103,8 @@ def download(name):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Download public EMG datasets into Dataset/public/")
     parser.add_argument("names", nargs="*", choices=list(DATASETS), default=["uci_gestures"])
+    parser.add_argument("--parallel", type=int, default=8, help="simultaneous connections for large files")
     args = parser.parse_args(argv)
-    for name in args.names: download(name)
+    for name in args.names: download(name, args.parallel)
 
 if __name__ == "__main__": main()

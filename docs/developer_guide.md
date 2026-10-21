@@ -19,7 +19,7 @@ How the code fits together, where to change things, and the rules that keep the 
 | `src/acquisition/` | `emg_logger` (EMG-only trials), `fused_logger` (EMG + camera labels), `landmark_recorder` (hand landmarks) |
 | `src/data/public_datasets.py` | Loader for `Dataset/`: long format, 100 Hz, segments split at gaps over 1 s |
 | `src/data/prepare_finetune.py` | Preprocess `Dataset/` into MOMENT-1 windows in `data/processed/moment/` |
-| `src/data/download_public.py` | Download public EMG data (UCI) into `Dataset/public/`, resume and verify |
+| `src/data/download_public.py` | Download public EMG data (UCI, EMG-EPN-612) into `Dataset/public/`: parallel ranges, resume, MD5 check |
 | `src/data/public_emg.py` | Convert public armband recordings into MD0437-like windows |
 | `src/preprocessing/` | `clean()` filters, `make_windows()` |
 | `src/features/` | `extract()` 8 features; `build_dataset.py` |

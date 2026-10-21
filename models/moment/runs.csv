@@ -1,6 +1,6 @@
-run_id,created,size,split,revin,folds,linear_probe_accuracy,lora_accuracy,lora_synthetic_patient_accuracy
-small_holdout_20261018-134750,2026-10-18T13:47:50+05:30,small,holdout,False,1,0.4551,0.4551,0.3588
-small_loso_20261018-134916,2026-10-18T13:49:16+05:30,small,loso,False,8,0.43,0.4321,0.4344
-small_loso_uci_extra_20261018-142536,2026-10-18T14:25:36+05:30,small,loso,False,8,0.3716,0.3915,0.4244
-small_loso_uci_pretrain_20261018-143946,2026-10-18T14:39:46+05:30,small,loso,False,8,0.4465,0.4441,0.4219
-small_loso_uci_pretrain_extra_20261018-144800,2026-10-18T14:48:00+05:30,small,loso,False,8,0.3995,0.4109,0.4282
+run_id,created,size,split,revin,folds,pretrain_data,extra_data,linear_probe_accuracy,lora_accuracy,lora_stroke_patient_accuracy
+small_holdout_20261021-191854,2026-10-21T19:18:54+05:30,small,holdout,False,1,,,0.4551,0.4873,0.3488
+small_loso_20261021-192025,2026-10-21T19:20:25+05:30,small,loso,False,8,,,0.43,0.4592,0.4938
+small_loso_epn_extra_20261021-210209,2026-10-21T21:02:09+05:30,small,loso,False,8,,epn612_windows.npz,0.4235,0.454,0.4722
+small_loso_epn_pretrain_20261021-193241,2026-10-21T19:32:41+05:30,small,loso,False,8,epn612_windows.npz,,0.403,0.4463,0.5536
+small_loso_uci_pretrain_20261021-201317,2026-10-21T20:13:17+05:30,small,loso,False,8,uci_gestures_windows.npz,,0.4304,0.4504,0.5395

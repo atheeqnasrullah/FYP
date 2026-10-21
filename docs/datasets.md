@@ -75,22 +75,24 @@ The web app's EMG Datasets page, EMG replay (`--emg-source replay`) and MOMENT-1
 
 For fine-tuning, `python -m src.data.prepare_finetune` turns this folder into model-ready windows in `data/processed/moment/`; see [fine_tuning_moment.md](fine_tuning_moment.md#data-preprocessing).
 
-## Public data (UCI EMG Data for Gestures)
+## Public data
 
-To test whether outside data improves accuracy, one public dataset was downloaded and converted. It is not committed (see `.gitignore`); anyone can fetch it with the script.
+To test whether outside data improves accuracy, two public datasets were downloaded and converted. They are not committed (see `.gitignore`); anyone can fetch them with `python -m src.data.download_public uci_gestures epn612` (large files use 8 parallel connections, resume after interruptions and are checked against the published MD5).
 
-| Item | Value |
-|---|---|
-| Dataset | [UCI EMG Data for Gestures](https://archive.ics.uci.edu/dataset/481/emg+data+for+gestures) (Lobov et al., *Sensors* 2018), CC BY 4.0 |
-| Download | `python -m src.data.download_public` into `Dataset/public/uci_gestures/` (17 MB) |
-| Content | 36 healthy people, 8-channel Myo armband, about 1 kHz, 2 series x 6-7 gestures of about 1.8 s |
-| Labels | Rest, fist (= Hand_Close), extended palm (= Hand_Open, only a few people), wrist flexion, wrist extension, radial deviation, ulnar deviation |
-| Conversion | `python -m src.data.public_emg uci_gestures`: each armband channel is rectified, smoothed (100 ms moving RMS), resampled to 100 Hz and scaled to our ADC range, then windowed like `Dataset/` (log1p, calibration, 512-sample windows, short gestures padded and masked) |
-| Output | `data/processed/public/uci_gestures_windows.npz`: 6,288 windows (36 people x 8 channels); 2,120 share our labels (Rest 1,008, Hand_Close 1,048, Hand_Open 64) |
+| Item | UCI EMG Data for Gestures | EMG-EPN-612 |
+|---|---|---|
+| Source | [archive.ics.uci.edu/dataset/481](https://archive.ics.uci.edu/dataset/481/emg+data+for+gestures) (Lobov et al., *Sensors* 2018) | [doi.org/10.5281/zenodo.4421500](https://doi.org/10.5281/zenodo.4421500) (v2.1, Escuela Politécnica Nacional) |
+| Licence | CC BY 4.0 | CC BY 4.0 |
+| Folder, size | `Dataset/public/uci_gestures/`, 17 MB | `Dataset/public/epn612/`, 5.5 GB zip, 11 GB unpacked |
+| People | 36 healthy | 612 healthy (306 + 306) |
+| Recording | 8-channel Myo armband, about 1 kHz; 2 series x 6-7 gestures of about 1.8 s | 8-channel Myo armband, 200 Hz; 150-300 labelled 5 s recordings per person (25 per gesture), gesture about 1 s inside |
+| Labels | Rest, fist (= Hand_Close), extended palm (= Hand_Open, only a few people), wrist flexion, wrist extension, radial deviation, ulnar deviation | noGesture (= Rest), fist (= Hand_Close), open (= Hand_Open), waveIn (wrist flexion), waveOut (wrist extension), pinch |
+| Conversion | `python -m src.data.public_emg uci_gestures`: all 8 channels | `python -m src.data.public_emg epn612`: one random channel per recording, full 5 s |
+| Output | `data/processed/public/uci_gestures_windows.npz`: 6,288 windows; 2,120 share our labels | `data/processed/public/epn612_windows.npz`: 137,700 windows (22,950 per gesture); 68,850 share our labels |
 
-The wrist movements keep their own names, because it is not known how they relate to our Left/Right/Up/Down. A second dataset, EMG-EPN-612 (612 people, 5.5 GB), was considered but its download was stopped; the script can still fetch it (`python -m src.data.download_public epn612`), but nothing uses it.
+Conversion, for both: each armband channel is rectified, smoothed (100 ms moving RMS), resampled to 100 Hz and scaled to our ADC range, then windowed like `Dataset/` (log1p, per-recording-channel calibration, 512-sample windows; short recordings padded and masked). The wrist movements keep their own names, because it is not known how they relate to our Left/Right/Up/Down.
 
-How much the public data helped is in [model_comparison.md](model_comparison.md#public-data-uci).
+How much the public data helped: [model_comparison.md](model_comparison.md#public-data-uci-and-emg-epn-612). In short, it did not improve accuracy on our volunteers.
 
 ## Your own recordings
 

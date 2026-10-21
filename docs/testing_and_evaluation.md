@@ -68,7 +68,7 @@ What this shows:
 
 ## Results: MOMENT-1 and the full model comparison
 
-On the same 8 volunteers, fine-tuned MOMENT-1-small reaches 43.2% leave-one-subject-out, against 37.4% for the SVM on 200 ms windows. On equal 5.12 s windows the classical models catch up: SVM 47.3%, and frozen MOMENT features with a random forest 48.1%, the best result. Public UCI data did not raise the best accuracy (pre-training MOMENT on it: 44.4%). Full tables, per movement and per volunteer: [model_comparison.md](model_comparison.md).
+On the same 8 volunteers, MOMENT-1-small fine-tuned with LoRA reaches 45.9% leave-one-subject-out (48.7% holdout), against 37.2% for the SVM on 200 ms windows. On equal 5.12 s windows the classical models catch up: SVM 47.3%, and frozen MOMENT features with a random forest 48.1%, the best result. Public data (UCI, EMG-EPN-612) did not raise accuracy on our volunteers. Fine-tuning results before 2026-10-21 were affected by a gradient-checkpointing bug and have been replaced. Full tables, per movement and per volunteer: [model_comparison.md](model_comparison.md).
 
 ## Results: EMG activity per movement
 

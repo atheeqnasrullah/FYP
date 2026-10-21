@@ -1,6 +1,8 @@
 # Fine-tuning stage: MOMENT-1
 
-**Status (2026-10-18): done.** MOMENT-1-small was fine-tuned on the preprocessed `Dataset/` windows (holdout and 8-fold leave-one-subject-out). It beats the classical baseline by about 5-6 points, mainly by recognising Hand_Open and Hand_Close much better; directions stay near chance. Results below; the fine-tuned models are in `models/moment/`.
+**Status (2026-10-21): done, corrected.** MOMENT-1-small fine-tuned with LoRA reaches 45.9% leave-one-subject-out on our 8 volunteers (48.7% on the S07-S09 holdout), 2.9 points above training the head alone. It does not overtake frozen MOMENT features + random forest (48.1%), and pre-training on public EMG data did not help; full comparison in [model_comparison.md](model_comparison.md).
+
+> **Correction (2026-10-21).** Runs before this date did not fine-tune the encoder: MOMENT enables gradient checkpointing by default, and with a frozen encoder that blocks every gradient to the LoRA adapters, so only the head trained. `build_model` now passes `enable_gradient_checkpointing: False`, the smoke test fails if the adapters do not move after one step, and all runs were repeated. The invalid runs were removed from `models/moment/`.
 
 ## Why MOMENT-1
 
@@ -82,7 +84,7 @@ Installed and tested: torch 2.14.1 (MPS available), momentfm 0.1.4, peft 0.13.2,
 ## Training plan
 
 1. **Phase A, linear probe:** frozen encoder, train only the classification head (3,591 parameters); up to 15 epochs, learning rate 1e-3, early stopping after 4 epochs without validation improvement.
-2. **Phase B, LoRA:** rank-8 adapters on the encoder's attention q and v projections plus the head (118,279 trainable parameters); up to 15 epochs, learning rate 2e-4, same early stopping.
+2. **Phase B, LoRA:** rank-8 adapters on the encoder's attention q and v projections plus the head (118,279 trainable parameters); up to 15 epochs, learning rate 2e-4, same early stopping. Gradient checkpointing is switched off so gradients reach the adapters.
 3. Evaluate both phases on the held-out subjects, and the LoRA model also on the stroke patient.
 4. Save everything about the run in one committed folder, `models/moment/<run>/` (next section).
 
@@ -116,53 +118,27 @@ uv pip install --python .venv-finetune/bin/python -r requirements-finetune.txt
 
 Verified before training: a model saved in this layout and reloaded gives identical outputs (maximum difference 0.0), and `moment_predict` reproduces the training calibration for S07 (mean 2.853).
 
-## Results (2026-10-18)
+## Results (2026-10-21)
 
-Two runs of MOMENT-1-small, without RevIN, saved in `models/moment/`. Both took about 1 minute (holdout) and 7 minutes (8-fold leave-one-subject-out) on the M3 Pro GPU. Chance is 14.3%.
+All runs: MOMENT-1-small, no RevIN, 8 volunteers, same splits as the classical models; times on an M3 Pro GPU. Chance is 14.3%.
 
-**Compared with the classical baseline on the same subjects:**
+| Run folder | Split | Training data | Head only (Phase A) | LoRA (Phase B) | Stroke patient `SP01` | Time |
+|---|---|---|---|---|---|---|
+| `small_holdout_20261021-191854` | holdout | Own data | 45.5% | **48.7%** | 34.9% | 2 min |
+| `small_loso_20261021-192025` | loso, 8 folds | Own data | 43.0% | **45.9%** | 49.4% | 12 min |
+| `small_loso_uci_pretrain_20261021-201317` | loso, 8 folds | Pre-trained on UCI (6,288 windows), then own data | 43.0% | 45.0% | 53.9% | 49 min |
+| `small_loso_epn_pretrain_20261021-193241` | loso, 8 folds | Pre-trained on EMG-EPN-612 (60,000 windows, 5 epochs), then own data | 40.3% | 44.6% | **55.4%** | 41 min |
+| `small_loso_epn_extra_20261021-210209` | loso, 8 folds | Own data + 3,000 EMG-EPN-612 windows (Rest, Hand_Open, Hand_Close) | 42.4% | 45.4% | 47.2% | 30 min |
 
-| Evaluation | MOMENT-1 LoRA | Best classical (SVM) | Difference |
-|---|---|---|---|
-| Holdout: test S07, S08, S09 (train S02-S05) | **45.5%** (macro F1 0.404) | 40.4% (macro F1 0.364), same training subjects | +5.1 points |
-| Leave-one-subject-out, 8 volunteers | **43.2%** (macro F1 0.369) | 37.4% (macro F1 0.330) | +5.8 points |
-| Synthetic stroke patient `SYN_STROKE_01` (trained on healthy only) | **43.4%** (mean over 8 LOSO models) | 25.5% (SVM), 36.7% (random forest) | +6.7 points over the best |
+LoRA per movement (LOSO recall, own data): Rest 65%, Hand_Open 82%, Hand_Close 74%, Left 31%, Right 21%, Up 17%, Down 26%. Hand_Open is recognised better than by any other method; directions stay near chance.
 
-The linear probe alone (Phase A) scores almost the same as LoRA (43.0% vs 43.2% LOSO; both 45.5% holdout): the pretrained encoder's features do most of the work, and the LoRA adapters add little on this amount of data.
+What the results show:
 
-**Per volunteer (LOSO, LoRA):** S02 35.9%, S03 21.3%, S04 50.6%, S05 55.5%, S06 43.5%, S07 43.5%, S08 50.8%, S09 44.5%. S03 is the hardest: its Hand_Open and Up recordings are quieter than its own Rest ([datasets.md](datasets.md)).
+- **LoRA fine-tuning works:** +2.9 points over the head alone (LOSO) and +3.2 on the holdout.
+- **It is not the best model:** frozen MOMENT features + random forest reach 48.1% LOSO, and an SVM on 5.12 s window features 47.3%.
+- **Public data did not help our volunteers:** every public-data run is 0.5-1.3 points below own-data fine-tuning. Pre-training learned the public data (EMG-EPN-612: 53.7% on held-out public people) but transferred poorly to the MD0437 signal. It did help the stroke patient (`SP01`: 55.4% vs 49.4%).
 
-**Per movement (LOSO recall, `confusion.png`):**
-
-| Movement | MOMENT-1 | SVM baseline |
-|---|---|---|
-| Rest | 72% | 81% |
-| Hand_Open | 74% | 46% |
-| Hand_Close | 76% | 65% |
-| Left | 32% | 21% |
-| Right | 18% | 7% |
-| Up | 19% | 15% |
-| Down | 3% | 18% |
-
-What this means:
-
-- **Hand gestures improved clearly.** Hand_Open (+28 points) and Hand_Close (+11) are recognised far better; the 5.12 s window and the pretrained encoder capture the shape of the activity, not just its level.
-- **Directions are still not recognisable from one forearm channel** (Left/Right/Up/Down 3-32%). The camera must keep deciding direction, as the system design already does.
-- **Possible future use:** EMG could confirm hand open/close alongside the camera. That would need live windows of the same length and rate (5.12 s at 100 Hz) and a real-time test; it is not part of the current prototype.
-
-All runs below were made before the patient file changed: their patient column is the generated patient `SYN_STROKE_01`. Healthy results are unaffected.
-
-| Run folder | Split | Training data | LoRA accuracy (healthy) | Synthetic patient |
-|---|---|---|---|---|
-| `models/moment/small_holdout_20261018-134750` | holdout | Own data | 45.5% | 35.9% |
-| `models/moment/small_loso_20261018-134916` | loso, 8 folds | Own data | 43.2% | 43.4% |
-| `models/moment/small_loso_uci_extra_20261018-142536` | loso, 8 folds | Own + UCI windows (Rest, Hand_Open, Hand_Close) | 39.1% | 42.4% |
-| `models/moment/small_loso_uci_pretrain_20261018-143946` | loso, 8 folds | Pre-trained on UCI, then own data | **44.4%** | 42.2% |
-| `models/moment/small_loso_uci_pretrain_extra_20261018-144800` | loso, 8 folds | Pre-trained on UCI + UCI windows | 41.1% | 42.8% |
-
-Pre-trained runs also keep the public-data adapter in `pretrain/`. The public-data experiments and why they helped little are explained in [model_comparison.md](model_comparison.md#public-data-uci); the fairer comparison with classical models on equal 5.12 s windows is in the same document (best overall: frozen MOMENT features + random forest, 48.1%).
-
-For a single model to use, take the holdout adapter (`folds/S07+S08+S09`) or any LOSO fold; each was trained on 6 or 4 volunteers.
+Pre-trained runs keep the public-data adapter in `pretrain/`. For a single model to use, take the holdout adapter (`small_holdout_20261021-191854/folds/S07+S08+S09`) or any LOSO fold; each was trained on 4 or 6 volunteers.
 
 ## Commands
 
@@ -177,19 +153,22 @@ From `FYP/`:
 .venv-finetune/bin/python -m src.models.moment_predict --adapter models/moment/<run>/folds/<fold> <csv files>   # 6. use it
 ```
 
-Other options: `--size base`, `--probe-epochs`, `--lora-epochs`, `--lora-rank`, `--batch-size`, `--patience`, `--class-weights`, `--revin`, `--data`, `--extra-data` (public windows added to training), `--pretrain-data` and `--pretrain-epochs` (pre-train LoRA on public data), `--tag` (name in the run folder).
+Other options: `--size base`, `--probe-epochs`, `--lora-epochs`, `--lora-rank`, `--batch-size`, `--patience`, `--class-weights`, `--revin`, `--data`, `--extra-data` and `--max-extra` (public windows added to training, capped and label-balanced), `--pretrain-data`, `--max-pretrain` and `--pretrain-epochs` (pre-train LoRA on public data), `--tag` (name in the run folder).
 
-## Smoke test result (2026-10-18)
+## Smoke test result (2026-10-21)
 
 ```text
-2494 healthy windows of 512 samples, 7 classes, 8 subjects, 1 fold(s); 301 synthetic-patient windows for extra testing
+2494 healthy windows of 512 samples, 7 classes, 8 subjects, 1 fold(s); 301 stroke-patient windows for extra testing
 linear probe: logits (32, 7), loss 1.938, trainable 3,591 of 35,340,999 parameters on mps
 LoRA: logits (32, 7), loss 1.941, trainable 118,279 of 35,459,278 parameters on mps
+LoRA adapters after one step: |B| = 4.91e+00
 save and reload: max logit difference 0.00e+00
 Smoke test passed: ready to fine-tune.
 ```
 
-The smoke test also saves the model in the run layout and reloads it. It found and fixed one incompatibility: peft 0.13 reads the model config like a dictionary, and MOMENT's config has no `.get()`, so `add_lora()` adds one.
+The smoke test checks three things: one training step per phase, that the LoRA adapters actually change (LoRA B starts at zero and must move; this check would have caught the gradient-checkpointing bug), and that a model saved in the run layout reloads with identical outputs. It also handles one incompatibility: peft 0.13 reads the model config like a dictionary, and MOMENT's config has no `.get()`, so `add_lora()` adds one.
+
+With real LoRA training a step takes 0.108 s per batch of 32 (0.043 s for the head alone), using about 1.3 GB of GPU memory.
 
 ## How the result is used
 
