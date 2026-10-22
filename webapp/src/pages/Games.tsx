@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { Card, ErrorBox, Loading, PageHeader, useToast } from '../components/ui'
+import { HardwareCheck } from '../components/HardwareCheck'
 import { pct, relativeDay } from '../format'
 import { useAsync } from '../hooks'
 import { PATIENT_RE } from './PatientForm'
@@ -224,6 +225,7 @@ export default function Games() {
                 </div>
               </label>
             </div>
+            <HardwareCheck mode={mode} disabled={!!running} />
           </Card>
 
           <div className="start-bar">

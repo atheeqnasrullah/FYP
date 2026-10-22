@@ -1,0 +1,24 @@
+%% Fig. 2. Wiring of the EMG acquisition hardware
+flowchart TB
+    EL(["<b>Electrodes</b><br/>yellow REF: elbow<br/>green IN+: upper forearm<br/>red IN-: 3-4 cm distal"])
+    BAT["<b>Split battery</b><br/>+9 V, 0 V, -9 V"]
+
+    MD["<b>MD0437 EMG module</b><br/>amplify, rectify, smooth<br/>output: activity envelope"]
+
+    ESP["<b>ESP32 DevKit</b><br/>GPIO34 (ADC1)<br/>12-bit, 11 dB, 1 kHz"]
+
+    PC["<b>Laptop</b><br/>Python + webcam"]
+
+    EL -- "REF, IN+, IN-" --> MD
+    BAT -- "+Vs, GND, -Vs" --> MD
+    MD -- "SIG and GND" --> ESP
+    ESP == "USB serial, 921600 baud<br/>timestamp_ms, adc_value" ==> PC
+
+    classDef hw fill:#e8ebf9,stroke:#2f3d8f,stroke-width:1.5px;
+    classDef pwr fill:#eeeeee,stroke:#444444,stroke-width:1.5px;
+    classDef pc fill:#fbe7cf,stroke:#b8650a,stroke-width:1.5px;
+    classDef el fill:#f7efd0,stroke:#8a7400,stroke-width:1.2px;
+    class MD,ESP hw;
+    class BAT pwr;
+    class PC pc;
+    class EL el;

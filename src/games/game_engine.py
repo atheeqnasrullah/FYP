@@ -63,7 +63,7 @@ class BaseGame:
             except Exception as exc:
                 print(f"Pygame window activation warning: {exc}", flush=True)
         self.font=pygame.font.Font(None,30); self.bus=bus; self.patient=patient_id; self.score=0; self.attempts=[]; self.running=True; self.cmd="Rest"; self.started=time.monotonic(); self.target=None; self.target_t=None; self.confidence=0.; self.emg_rms=0.; self.emg_mav=0.
-        self.runtime_message=None; self.latencies=[]
+        self.runtime_message=None; self.latencies=[]; self.aborted=False
         cfg=load_settings()
         self.session_seconds=float(cfg.get("game_session_seconds",180) or 0)
         self.difficulty_mode=str(cfg.get("game_difficulty","auto"))
@@ -106,9 +106,7 @@ class BaseGame:
         except queue.Empty: pass
         if item is not None and item.get("vision_ts_ms") is not None:
             self.latencies.append((self.cmd,time.time()*1000-item["vision_ts_ms"]))
-        try:
-            while True: self.runtime_message=status_bus.get_nowait()
-        except queue.Empty: pass
+        self.check_camera()
         left=self.remaining()
         if left is not None:
             second=math.ceil(left)
@@ -131,6 +129,32 @@ class BaseGame:
         self.started+=gap
         if self.target_t is not None: self.target_t+=gap
         self.cmd="Rest"
+
+    def check_camera(self):
+        """Read pipeline status; if the webcam thread died in a webcam mode, explain it and end the game."""
+        try:
+            while True: self.runtime_message=status_bus.get_nowait()
+        except queue.Empty: pass
+        if self.running and getattr(self,"control_mode","keyboard") in ("vision","live") and str(self.runtime_message or "").startswith("_vision"):
+            self.camera_error_screen()
+
+    def camera_error_screen(self):
+        """Without a camera the patient cannot play, so show why and close without saving a session."""
+        detail=str(self.runtime_message).split(": ",1)[-1]
+        clock=pygame.time.Clock(); shown=time.monotonic(); close_after=60
+        lines=["Close Zoom, Teams, the Camera app or any browser tab using the camera,",
+               "and allow camera access in Windows Settings > Privacy > Camera.",
+               "If the API was started from an AI assistant or IDE sandbox, start it",
+               "again from a normal terminal: python -m uvicorn backend.app:app"]
+        while time.monotonic()-shown<close_after:
+            if any(e.type==pygame.QUIT or e.type==pygame.KEYDOWN for e in pygame.event.get()): break
+            self.screen.fill(PANEL)
+            self.text("The webcam could not be opened",(self.W//2,110),BAD,46,center=True)
+            self.text(detail[:90],(self.W//2,170),MUTED,22,center=True)
+            for i,line in enumerate(lines): self.text(line,(self.W//2,240+i*34),INK,26,center=True)
+            self.text(f"Press any key to close   |   closes in {int(close_after-(time.monotonic()-shown))} s",(self.W//2,self.H-70),MUTED,24,center=True)
+            pygame.display.flip(); clock.tick(15)
+        self.aborted=True; self.running=False
 
     def wait_for_required_emg(self):
         """Freeze gameplay in Webcam + EMG mode until fresh valid sensor data returns."""
@@ -280,6 +304,8 @@ class BaseGame:
                 elif (e.type==pygame.KEYDOWN and e.key in (pygame.K_SPACE,*PAUSE_KEYS)) or e.type==pygame.MOUSEBUTTONDOWN: start=True
             hold=0.0
             if camera:
+                self.check_camera()
+                if not self.running: break
                 with lock: visual=latest.get("vis")
                 if visual and visual[0]=="Hand_Open":
                     opened_since=opened_since or time.monotonic(); hold=time.monotonic()-opened_since
@@ -327,6 +353,9 @@ class BaseGame:
         except Exception:
             return None
     def save_session(self):
+        if self.aborted:
+            print("Session not saved: the webcam could not be opened.",flush=True)
+            pygame.quit(); return
         payload={"patient_id":self.patient,"game_name":self.name,"total_score":self.score,"duration_s":int(time.monotonic()-self.started),"attempts":self.attempts}
         cfg=load_settings()
         self.save_latency_log()

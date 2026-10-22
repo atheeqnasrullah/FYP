@@ -1,0 +1,27 @@
+%% Fig. 4. Offline EMG classification pipelines compared on the same subject splits
+block-beta
+    columns 3
+    D["Dataset: 9 healthy volunteers, 7 movements, about 60 s each, 100 Hz"]:3
+    A1["200 ms windows,\n100 ms step"] B1["5.12 s windows: 10 ms grid, S01 excluded,\nlog1p + per-subject z-score, 75% overlap"]:2
+    A2["8 hand-crafted\nfeatures"] B2["8 hand-crafted\nfeatures"] C2["MOMENT-1-small\nencoder (35.3 M)"]
+    A3["LDA / SVM / RF"] B3["LDA / SVM / RF"] C3["frozen + LDA/SVM/RF;\nlinear probe; LoRA"]
+    EV["Same subject splits: leave-one-subject-out (8 folds) and holdout;\naccuracy and macro F1; optional public UCI data"]:3
+
+    D --> A1
+    D --> B1
+    A1 --> A2
+    B1 --> B2
+    B1 --> C2
+    A2 --> A3
+    B2 --> B3
+    C2 --> C3
+    A3 --> EV
+    B3 --> EV
+    C3 --> EV
+
+    classDef step fill:#ffffff,stroke:#333333,stroke-width:1.2px;
+    classDef model fill:#e8ebf9,stroke:#2f3d8f,stroke-width:1.2px;
+    classDef best fill:#e3f2e1,stroke:#2e7d32,stroke-width:2px;
+    class D,A1,B1,A2,B2,EV step
+    class A3,B3,C2 model
+    class C3 best

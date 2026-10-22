@@ -1,0 +1,22 @@
+%% Fig. 5. Game session flow with automatic difficulty adaptation (read in a snake: left to right, then right to left)
+block-beta
+    columns 2
+    A["Start screen,\ncountdown 3-2-1"] C["Prompt next\ntarget movement"]
+    S["Correct: +10 (+5 on a streak\nof 3+); missed: streak reset"] E["Compare fused\ncommand with target"]
+    I["Auto mode, last 6 attempts:\n≥ 80%: level +0.5; ≤ 40%: −0.5"] T["Time left? yes: next\ntarget; no: end session"]
+    U["Upload to API (or offline\nqueue); save level"] R["Results: score, accuracy,\nstreak, 1-3 stars"]
+
+    A --> C
+    C --> E
+    E --> S
+    S --> I
+    I --> T
+    T --> R
+    R --> U
+
+    classDef step fill:#ffffff,stroke:#333333,stroke-width:1.2px;
+    classDef good fill:#e3f2e1,stroke:#2e7d32,stroke-width:1.2px;
+    classDef dec fill:#f4f4f4,stroke:#333333,stroke-width:1.2px;
+    class A,C,R,U step
+    class S,I good
+    class E,T dec

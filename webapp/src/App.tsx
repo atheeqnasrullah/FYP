@@ -9,6 +9,7 @@ import Sessions from './pages/Sessions'
 import Games from './pages/Games'
 import Datasets from './pages/Datasets'
 import Settings from './pages/Settings'
+import Hardware from './pages/Hardware'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
               <Route path="patients/:pid" element={<PatientDetail />} />
               <Route path="sessions" element={<Sessions />} />
               <Route path="games" element={<Games />} />
+              <Route path="hardware" element={<Hardware />} />
               <Route path="datasets" element={<Datasets />} />
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" replace />} />

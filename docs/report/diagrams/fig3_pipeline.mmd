@@ -1,0 +1,22 @@
+%% Fig. 3. Vision, EMG and fusion pipelines (each column runs in its own thread)
+block-beta
+    columns 2
+    V1["Vision thread: frame\n+ time, 21 landmarks"] E1["EMG thread: serial\nline, drop invalid"]
+    V2["Finger curl, reach,\npinch ratio"] E2["Envelope passes\nthrough unfiltered"]
+    V3["Rules: Rest, Hand\nOpen, Hand Close"] E3["200 ms window\nevery 100 ms"]
+    V4["3-of-5 smoothing;\npalm motion: L, R, U, D"] E4["8 features: RMS,\nMAV, WL, PEAK, ..."]
+    F["Fusion thread (50 ms): confidence below 0.6 is Rest;\nmajority of 5; attach EMG window; send to game"]:2
+
+    V1 --> V2
+    V2 --> V3
+    V3 --> V4
+    E1 --> E2
+    E2 --> E3
+    E3 --> E4
+    V4 --> F
+    E4 --> F
+
+    classDef step fill:#ffffff,stroke:#333333,stroke-width:1.2px;
+    classDef fus fill:#e3f2e1,stroke:#2e7d32,stroke-width:1.5px;
+    class V1,V2,V3,V4,E1,E2,E3,E4 step
+    class F fus

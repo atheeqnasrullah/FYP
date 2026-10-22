@@ -10,6 +10,7 @@ const NAV = [
   { to: '/patients', label: 'Patients', icon: 'patients' },
   { to: '/sessions', label: 'Sessions', icon: 'sessions' },
   { to: '/games', label: 'Game Launcher', icon: 'games' },
+  { to: '/hardware', label: 'Hardware', icon: 'hardware' },
   { to: '/datasets', label: 'EMG Datasets', icon: 'datasets' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ]
@@ -19,6 +20,7 @@ export function Layout() {
   const { resolved, setMode } = useTheme()
   const health = useAsync(() => api.health(), [], 15000)
   const game = useAsync(() => api.gameStatus(), [], 5000)
+  const hardware = useAsync(() => api.hardwarePorts(), [], 5000)
   const location = useLocation()
   const online = !health.error && health.data?.status === 'ok'
 
@@ -44,6 +46,11 @@ export function Layout() {
           ))}
         </nav>
         <div className="sidebar-foot">
+          {online && hardware.data && (
+            <NavLink to="/hardware" onClick={() => setOpen(false)} className={`api-pill hw-pill ${hardware.data.configured_present ? 'ok' : 'down'}`} title="EMG sensor connection">
+              <span className="dot" /> ESP32 {hardware.data.configured_present ? `on ${hardware.data.configured_port}` : 'not connected'}
+            </NavLink>
+          )}
           <div className={`api-pill ${online ? 'ok' : 'down'}`}>
             <span className="dot" /> API {health.loading && !health.data && !health.error ? 'checking…' : online ? 'online' : 'offline'}
           </div>

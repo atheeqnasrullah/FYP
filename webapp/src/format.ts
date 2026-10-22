@@ -1,3 +1,5 @@
+import type { EmgReport } from './types'
+
 export const pct = (v: number | null | undefined, digits = 0) =>
   v === null || v === undefined || Number.isNaN(v) ? '—' : `${(v * 100).toFixed(digits)}%`
 
@@ -65,4 +67,17 @@ export const daysSince = (iso: string | null | undefined, now = new Date()) => {
   if (!iso) return null
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? null : Math.floor((now.getTime() - d.getTime()) / 86400000)
+}
+
+/** Badge tone and label for an EMG check or live-stream verdict. */
+export function emgTone(r?: EmgReport) {
+  if (!r) return 'neutral' as const
+  if (r.status !== 'streaming') return 'bad' as const
+  return r.warnings.length ? ('warn' as const) : ('good' as const)
+}
+
+export function emgBadge(r?: EmgReport) {
+  if (!r) return 'Not tested'
+  if (r.status === 'streaming') return `Streaming${r.rate_hz ? ` · ${r.rate_hz} Hz` : ''}`
+  return r.status === 'no_data' ? 'No data' : 'Unreadable data'
 }

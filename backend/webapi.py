@@ -240,6 +240,9 @@ def launch(req: Launch):
         raise HTTPException(400, "Difficulty must be auto, easy, medium or hard")
     if _status()["running"]:
         raise HTTPException(409, "A game is already running. Stop it before starting another.")
+    # Close any live sensor/camera preview in the web app so the game can open the devices.
+    from backend.hardware import release_all
+    release_all()
     # "replay" is live mode with EMG played from Dataset/ instead of the ESP32.
     command = [sys.executable, "-u", str(ROOT / "main.py"), "live" if req.mode == "replay" else req.mode, "--game", req.game,
                "--patient", req.patient_id.strip(), "--difficulty", req.difficulty, "--duration", str(req.duration_s)]

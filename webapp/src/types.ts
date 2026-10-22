@@ -145,3 +145,54 @@ export interface SettingsResponse {
   labels: string[]
   raw: string
 }
+
+export interface SerialPortInfo {
+  device: string
+  description: string
+  manufacturer: string | null
+  chip: string | null
+  likely_esp32: boolean
+}
+
+export interface HardwarePorts {
+  configured_port: string
+  configured_present: boolean
+  suggested_port: string | null
+  baud_rate: number
+  fs: number
+  camera_index: number
+  ports: SerialPortInfo[]
+  game_using_emg: boolean
+  game_using_camera: boolean
+}
+
+export type EmgStatus = 'streaming' | 'no_data' | 'wrong_format'
+
+export interface EmgReport {
+  status: EmgStatus
+  message: string
+  port: string
+  baud_rate: number
+  expected_hz: number
+  samples: number
+  bytes: number
+  rate_hz: number | null
+  bad_lines: number
+  bad_examples: string[]
+  messages: string[]
+  min: number | null
+  max: number | null
+  mean: number | null
+  warnings: string[]
+  signal?: number[]
+}
+
+export interface CameraCheck {
+  status: 'ok'
+  index: number
+  backend: string
+  width: number
+  height: number
+  dark: boolean
+  image: string
+}

@@ -1,0 +1,27 @@
+%% Fig. 1. System architecture (green: completed; dashed: future work)
+block-beta
+    columns 2
+    P["Patient: hand and\nwrist exercises"]:2
+    EMG["EMG sensor + ESP32\nMD0437, USB serial"] CAM["Webcam\nabout 30 fps"]
+    EP["EMG pipeline\n8 activity features"] VP["Vision pipeline\nMediaPipe + rules"]
+    FU["Fusion engine (every 50 ms)\ncamera label + EMG features"]:2
+    G["Four Pygame games\nadaptive difficulty"] WEB["RehabHub web app\nphysiotherapist"]
+    API["FastAPI + SQLite\noffline queue"] MSG["Login, messaging,\nremote access"]
+
+    P --> EMG
+    P --> CAM
+    EMG --> EP
+    CAM --> VP
+    EP --> FU
+    VP --> FU
+    FU --> G
+    G --> API
+    API --> WEB
+    WEB --> G
+
+    classDef done fill:#e3f2e1,stroke:#2e7d32,stroke-width:1.5px;
+    classDef future fill:#ffffff,stroke:#555555,stroke-width:1.5px,stroke-dasharray:5 4;
+    classDef person fill:#f8e1e7,stroke:#8a2846,stroke-width:1.5px;
+    class EMG,CAM,EP,VP,FU,G,API,WEB done
+    class MSG future
+    class P person

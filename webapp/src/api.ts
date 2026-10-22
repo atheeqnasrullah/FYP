@@ -1,6 +1,6 @@
 import type {
-  Attempt, DatasetCompare, DatasetFeatures, DatasetFile, DatasetSignal, GameStatus, GamesInfo,
-  Overview, Patient, PatientSummary, Progress, Session, SettingsResponse,
+  Attempt, CameraCheck, DatasetCompare, DatasetFeatures, DatasetFile, DatasetSignal, EmgReport, GameStatus, GamesInfo,
+  HardwarePorts, Overview, Patient, PatientSummary, Progress, Session, SettingsResponse,
 } from './types'
 
 const STORAGE_KEY = 'rehabhub.apiUrl'
@@ -98,4 +98,11 @@ export const api = {
 
   settings: () => request<SettingsResponse>('/settings'),
   saveSettings: (raw: string) => request<SettingsResponse>('/settings', json('PUT', { raw })),
+
+  hardwarePorts: () => request<HardwarePorts>('/hardware/ports'),
+  saveHardware: (cfg: { serial_port?: string; camera_index?: number }) => request<HardwarePorts>('/hardware/config', json('PUT', cfg)),
+  emgCheck: (port?: string) => request<EmgReport>(`/hardware/emg/check${q({ port })}`),
+  emgStreamUrl: (port?: string) => `${getApiUrl()}/hardware/emg/stream${q({ port })}`,
+  cameraCheck: (index?: number) => request<CameraCheck>(`/hardware/camera/check${q({ index })}`),
+  cameraStreamUrl: (index: number) => `${getApiUrl()}/hardware/camera/stream${q({ index, t: Date.now() })}`,
 }
