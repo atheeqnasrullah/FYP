@@ -21,7 +21,7 @@ The system turns hand movements seen by a webcam into controls for four rehabili
 | G2 Measure muscle activity | The MD0437 EMG envelope gives RMS, MAV and six more features per 200 ms window |
 | G3 Engage the patient | Four Pygame games with start screens, a timer, rewards and adaptive difficulty |
 | G4 Monitor progress | Sessions go to a local FastAPI + SQLite service and appear in the RehabHub web app |
-| G5 Stay testable without hardware | Keyboard, simulator and EMG replay inputs; 47 automated tests |
+| G5 Stay testable without hardware | Keyboard, simulator and EMG replay inputs; 57 automated tests |
 
 **In scope:** single-channel EMG acquisition, webcam movement detection, four PC games, adaptive difficulty, local API and database, web app and Streamlit dashboard, offline EMG analysis and classifier research, healthy-volunteer data.
 
@@ -35,7 +35,7 @@ The core loop (camera control, four games, session records, monitoring) is built
 |---|---|---|
 | MD0437 EMG sensor + ESP32 acquisition | Built | 1 kHz firmware, USB serial at 921600 baud, live feature extraction |
 | Webcam hand detection (open, close, left, right, up, down) | Built | MediaPipe landmarks, gesture rules and palm-motion directions |
-| EMG strength + camera position combined to control games | Changed | The camera decides every action; EMG RMS/MAV is shown and logged, and Webcam + EMG mode waits for live EMG. No strength threshold is applied |
+| EMG strength + camera position combined to control games | Built (changed) | The camera decides every action; in Webcam + EMG mode a grip action (pop, brake, grab, pick up) also needs a per-patient effort threshold from a relax-then-squeeze check. EMG never chooses the movement |
 | Balloon Pop | Built | Aim with the hand, full fist pops; golden bonus balloons |
 | Car game | Built | Hand position picks one of three lanes; fist brakes; catch stars, avoid traffic |
 | Shape placement | Built | Wooden shape sorter: fist to grab, open hand to drop in the matching hole |

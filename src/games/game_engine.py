@@ -6,10 +6,18 @@ from src.utils.session_sync import PENDING, upload_session, sync_pending_session
 from src.realtime.pipeline import latest, lock, status_bus, emg_is_ready
 from src.games.audio import SoundBoard
 from src.games.difficulty import Difficulty
+from src.games.effort import calibrate, effort_pct, load_calibration, parse_required, required_effort, save_calibration
 from src.games.summary import encouragement, friendly, stars, summarize
 
 KEYMAP={pygame.K_LEFT:"Left",pygame.K_RIGHT:"Right",pygame.K_UP:"Up",pygame.K_DOWN:"Down",pygame.K_o:"Hand_Open",pygame.K_c:"Hand_Close",pygame.K_s:"Supination",pygame.K_p:"Pronation",pygame.K_SPACE:"Rest"}
 PAUSE_KEYS=(pygame.K_RETURN,pygame.K_KP_ENTER)
+
+SOURCE_NAMES={"keyboard":"Keyboard","sim":"Simulator","vision":"Camera"}
+
+
+def activity_level(pct):
+    """Words for a relative muscle-activity percentage."""
+    return "Low" if pct<35 else "Medium" if pct<70 else "High"
 
 # High-contrast palette shared by the HUD and the start/results screens.
 INK=(245,247,250); MUTED=(186,198,214); GOLD=(255,214,92); GOOD=(110,231,160); BAD=(255,128,112); PANEL=(10,18,32)
@@ -72,15 +80,21 @@ class BaseGame:
         self.difficulty=Difficulty(self.difficulty_mode,patient_id,self.name)
         self.sfx=None; self.popups=[]; self.streak=0; self.best_streak=0; self.time_up=False; self._last_tick_second=None
         self._fonts={}
+        # Input feedback: which input drove each action, how confident, and how much muscle activity.
+        self.cards=[]; self._emg_peak=0.0; self.emg_source="serial"
+        # Grip effort threshold (Webcam + EMG mode): calibrated per patient, see src/games/effort.py.
+        self.effort_setting=parse_required(cfg.get("game_effort_required","auto"))
+        self.calibrate_each_session=bool(cfg.get("game_emg_calibration",True))
+        self.calibration=None; self._grip=self._new_grip()
 
     # ------------------------------------------------------------ session flow
     def begin(self):
         """Start screen and countdown, then reset the clock so only play time counts."""
         self.difficulty=Difficulty(self.difficulty_mode,self.patient,self.name)
         self.sfx=SoundBoard(self.sound_enabled)
-        if self.show_screens:
-            self.intro_screen()
-            if self.running: self.countdown()
+        if self.show_screens: self.intro_screen()
+        if self.running: self.setup_effort()
+        if self.show_screens and self.running: self.countdown()
         self.started=time.monotonic()
         if self.target is not None: self.target_t=self.started
         return self.running
@@ -178,11 +192,153 @@ class BaseGame:
         self.started+=gap
         if self.target_t is not None: self.target_t+=gap
 
+    # ------------------------------------------------------------ input feedback
+    def input_source(self):
+        """Where the movement commands come from, in words for the patient and therapist."""
+        mode=getattr(self,"control_mode","keyboard")
+        if mode=="live": return "Camera + EMG replay" if getattr(self,"emg_source","serial")=="replay" else "Camera + EMG sensor"
+        return SOURCE_NAMES.get(mode,str(mode))
+    def emg_activity(self):
+        """Muscle effort now, 0-100 (None without EMG).
+
+        With a calibration it is the share of the patient's range from rest to strongest squeeze;
+        without one, the share of the strongest reading this session. The MD0437 gives an activity
+        envelope, not a calibrated force, so this is relative effort, not a strength measurement."""
+        rms=float(self.emg_rms or 0)
+        if rms<=0: return None
+        if self.calibration: return effort_pct(rms,self.calibration["rest_rms"],self.calibration["max_rms"])
+        self._emg_peak=max(self._emg_peak,rms)
+        return 100*rms/self._emg_peak
+    def input_snapshot(self):
+        pct=self.emg_activity()
+        return {"source":self.input_source(),"gesture":friendly(self.cmd) if self.cmd else "Rest",
+                "confidence":float(self.confidence or 0),"activity":pct,"rms":float(self.emg_rms or 0)}
+    def action_card(self,title,pos=None,ok=True,activity=None,need=None):
+        """Card at the place of an action showing what triggered it (gesture, input, confidence, effort)."""
+        snap=self.input_snapshot()
+        if activity is not None: snap["activity"]=activity
+        self.cards.append({**snap,"title":title,"ok":ok,"pos":pos,"born":time.monotonic(),"need":need})
+        self.cards=self.cards[-3:]
+
+    # ------------------------------------------------------------ grip effort threshold
+    def effort_gated(self):
+        """Grip actions need a minimum effort only in Webcam + EMG mode; other modes have no EMG."""
+        return getattr(self,"control_mode","keyboard")=="live" and self.required_effort()>0
+    def required_effort(self):
+        return required_effort(self.effort_setting,self.difficulty)
+    def effort_ok(self):
+        if not self.effort_gated(): return True
+        pct=self.emg_activity()
+        return pct is not None and pct>=self.required_effort()
+    @staticmethod
+    def _new_grip(): return {"active":False,"ready":False,"fired":False,"best":0.0,"pos":None}
+    def grip(self,closed,ready=True,pos=None):
+        """Follow one fist against the effort threshold.
+
+        Returns "fire" once, when a fist that can act (ready) first reaches the required effort,
+        and "weak" once, when such a fist opens without reaching it; otherwise None. Outside
+        Webcam + EMG mode effort is not measured, so a ready fist fires at once."""
+        g=self._grip
+        if not closed:
+            weak=g["active"] and g["ready"] and not g["fired"]
+            self.weak_grip={"best":g["best"],"pos":g["pos"]} if weak else None
+            self._grip=self._new_grip()
+            return "weak" if weak else None
+        g["active"]=True; g["pos"]=pos
+        if ready:
+            g["ready"]=True; g["best"]=max(g["best"],self.emg_activity() or 0.0)
+            if not g["fired"] and self.effort_ok():
+                g["fired"]=True; return "fire"
+        return None
+    def log_weak_grip(self,pos=None):
+        """Record a fist that never reached the required effort as a failed attempt."""
+        weak=getattr(self,"weak_grip",None) or {"best":0.0,"pos":None}
+        best=weak["best"]; need=self.required_effort()
+        # The hand has opened by now; record the fist that was attempted.
+        cmd=self.cmd; self.cmd="Hand_Close"
+        self.log("Weak_Grip",pos=pos or weak["pos"],title=f"Squeeze harder: {best:.0f}% of {need:.0f}%",card=True,effort=best,grip=True)
+        self.cmd=cmd
+
+    def setup_effort(self):
+        """Webcam + EMG mode: measure the patient's rest and strongest squeeze so effort is relative to them."""
+        if getattr(self,"control_mode","keyboard")!="live": return
+        if getattr(self,"emg_source","serial")=="replay":
+            # A recording cannot follow instructions, so its own Rest and Hand_Close parts stand in.
+            try:
+                from src.realtime.emg_replay import replay_calibration
+                rest,peak=replay_calibration()
+                self.calibration={"rest_rms":rest,"max_rms":peak,"source":"replay"}
+            except Exception as exc:
+                print(f"EMG replay calibration failed ({exc}); effort is relative to the session's strongest reading.",flush=True)
+            return
+        saved=load_calibration(self.patient)
+        if self.show_screens and self.calibrate_each_session:
+            result=self.calibration_screen(saved)
+            if result: saved=save_calibration(self.patient,*result,"sensor")
+        self.calibration=saved
+        if saved is None: print("No EMG calibration for this patient; effort is relative to the session's strongest reading.",flush=True)
+    def calibration_screen(self,saved):
+        """Two short steps, relax then squeeze. Returns (rest_rms, max_rms), or None if skipped or no squeeze was seen."""
+        clock=pygame.time.Clock()
+        steps=(("rest","Relax your hand","Rest your arm on the table and let your hand go loose."),
+               ("squeeze","Now squeeze!","Make a fist as hard as you comfortably can, and hold it."))
+        for attempt in range(2):
+            values={"rest":[],"squeeze":[]}
+            for number,(key,title,detail) in enumerate(steps,1):
+                shown=time.monotonic(); seconds=3.0
+                while self.running and time.monotonic()-shown<seconds:
+                    for e in pygame.event.get():
+                        if e.type==pygame.QUIT or (e.type==pygame.KEYDOWN and e.key==pygame.K_ESCAPE): self.running=False
+                        elif e.type==pygame.KEYDOWN and e.key==pygame.K_s and saved: return None
+                    self.wait_for_required_emg()
+                    with lock: features=latest.get("emg_features")
+                    rms=float((features or {}).get("RMS",0.0)); age=time.monotonic()-shown
+                    if age>0.8: values[key].append(rms)   # skip the moment the hand is still changing
+                    self.draw_camera_background((18,30,52),overlay_alpha=190)
+                    card=pygame.Rect(110,70,self.W-220,self.H-140); self.panel(card,220)
+                    self.text(f"Muscle check   |   step {number} of 2",(self.W//2,card.y+36),MUTED,26,center=True)
+                    self.text(title,(self.W//2,card.y+100),GOOD if key=="squeeze" else GOLD,62,center=True)
+                    self.text(detail,(self.W//2,card.y+156),INK,27,center=True)
+                    pygame.draw.rect(self.screen,(60,72,92),(self.W//2-180,card.y+200,360,14),border_radius=7)
+                    pygame.draw.rect(self.screen,GOLD,(self.W//2-180,card.y+200,int(360*min(1,age/seconds)),14),border_radius=7)
+                    self.text(f"{max(0,seconds-age):.0f} s",(self.W//2+196,card.y+198),MUTED,24)
+                    self.text(f"EMG RMS {rms:.0f}",(self.W//2,card.y+246),MUTED,24,center=True)
+                    self.text("This sets how strong a grip each game needs, for this patient.",(self.W//2,card.bottom-70),MUTED,22,center=True)
+                    self.text(f"S: use the saved check from {saved['date'][:10]}   |   Esc: cancel" if saved else "Esc: cancel",(self.W//2,card.bottom-40),MUTED,22,center=True)
+                    pygame.display.flip(); clock.tick(30)
+                if not self.running: return None
+            result=calibrate(values["rest"],values["squeeze"])
+            need=self.required_effort()
+            lines=([f"Rest {result[0]:.0f}   |   strongest squeeze {result[1]:.0f} (EMG RMS)",
+                    f"A grip counts at {need:.0f}% of your strongest squeeze." if need>0 else "No minimum grip in this session."]
+                   if result else ["The squeeze was not stronger than rest.","Check the electrodes, then squeeze again."+("" if attempt==0 else " Using the saved check.")])
+            shown=time.monotonic()
+            while self.running and time.monotonic()-shown<2.5:
+                for e in pygame.event.get():
+                    if e.type==pygame.QUIT or (e.type==pygame.KEYDOWN and e.key==pygame.K_ESCAPE): self.running=False
+                self.draw_camera_background((18,30,52),overlay_alpha=190)
+                self.panel(pygame.Rect(110,70,self.W-220,self.H-140),220)
+                self.text("Muscle check done" if result else "Let's try that again",(self.W//2,self.H//2-60),GOOD if result else GOLD,52,center=True)
+                for i,line in enumerate(lines): self.text(line,(self.W//2,self.H//2+i*36),INK,27,center=True)
+                pygame.display.flip(); clock.tick(30)
+            if result or not self.running: return result
+        return None
+
     # ------------------------------------------------------------ scoring and feedback
     def target_set(self,label): self.target=label; self.target_t=time.monotonic()
-    def log(self,detected):
+    def log(self,detected,pos=None,title=None,card=False,effort=None,grip=False):
+        """Record one attempt. card=True also shows an action card at pos (screen x, y).
+
+        grip=True marks a grip action, which records the required effort and whether it was met;
+        effort overrides the current effort reading (a weak grip logs its strongest moment)."""
         if self.target is None: return False
-        correct=detected==self.target; vision_label=self.cmd if getattr(self,"control_mode","keyboard") in ("vision","live") else None; self.attempts.append({"ts":time.strftime("%Y-%m-%dT%H:%M:%S"),"target_movement":self.target,"detected_movement":detected,"vision_label":vision_label,"correct":correct,"reaction_time_ms":int((time.monotonic()-self.target_t)*1000),"emg_rms":float(self.emg_rms),"emg_mav":float(self.emg_mav),"confidence":float(self.confidence)})
+        snap=self.input_snapshot()
+        if effort is not None: snap["activity"]=effort
+        need=self.required_effort() if grip and self.effort_gated() else None
+        correct=detected==self.target; vision_label=self.cmd if getattr(self,"control_mode","keyboard") in ("vision","live") else None; self.attempts.append({"ts":time.strftime("%Y-%m-%dT%H:%M:%S"),"target_movement":self.target,"detected_movement":detected,"vision_label":vision_label,"correct":correct,"reaction_time_ms":int((time.monotonic()-self.target_t)*1000),"emg_rms":float(self.emg_rms),"emg_mav":float(self.emg_mav),"confidence":float(self.confidence),
+            "input_source":snap["source"],"emg_activity_pct":None if snap["activity"] is None else round(snap["activity"],1),
+            "effort_required_pct":None if need is None else round(need,1),"effort_ok":None if need is None or snap["activity"] is None else snap["activity"]>=need})
+        if card: self.action_card(title or (friendly(detected) if correct else f"Not this one: {friendly(detected)}"),pos,correct,snap["activity"],need)
         if correct:
             self.streak+=1; self.best_streak=max(self.best_streak,self.streak)
             self.score+=10+(5 if self.streak>=3 else 0)
@@ -290,6 +446,100 @@ class BaseGame:
             alpha=int(255*min(1,(1.6-age)/0.5))
             self.text(p["text"],(p["x"],p["y"]-age*30),p["color"],p["size"],center=True,alpha=alpha)
         self.popups=alive
+
+    def present(self):
+        """Draw the input strip and action cards on top of everything, then show the frame."""
+        self.draw_input_strip()
+        self.draw_grip_meter()
+        self.draw_action_cards()
+        pygame.display.flip()
+
+    def draw_activity_bar(self,x,y,width,pct,alpha=255,need=None):
+        """Effort bar; with need, a white tick marks the required effort and the bar turns green above it."""
+        level=activity_level(pct)
+        colour=(GOOD if pct>=need else GOLD) if need is not None else {"Low":MUTED,"Medium":GOLD,"High":GOOD}[level]
+        bar=pygame.Surface((width,14),pygame.SRCALPHA)
+        pygame.draw.rect(bar,(55,66,86,alpha),(0,2,width,10),border_radius=5)
+        pygame.draw.rect(bar,(*colour,alpha),(0,2,max(4,int(width*min(pct,100)/100)),10),border_radius=5)
+        if need is not None:
+            tick=int(width*min(need,100)/100); pygame.draw.rect(bar,(*INK,alpha),(max(0,tick-1),0,3,14))
+        self.screen.blit(bar,(x,y-2))
+        return level,colour
+    def draw_input_strip(self):
+        """Live input status under the top bar: source, detected gesture + confidence, muscle activity."""
+        snap=self.input_snapshot(); w,h=380,46
+        x,y=self.W-w-10,64+(28 if self.runtime_message else 0)
+        self.panel((x,y,w,h),210,radius=10)
+        self.text(snap["source"],(x+10,y+6),MUTED,18,shadow=False)
+        gesture=snap["gesture"]; conf=snap["confidence"]
+        conf_text=f"{conf*100:.0f}%" if conf>0 and getattr(self,"control_mode","keyboard") in ("vision","live") else ""
+        right=x+w-10
+        if conf_text:
+            cw=self.get_font(20).size(conf_text)[0]
+            self.text(conf_text,(right-cw,y+5),GOOD if conf>=0.8 else GOLD if conf>=0.6 else BAD,20,shadow=False); right-=cw+8
+        gw=self.get_font(22).size(gesture)[0]
+        self.text(gesture,(right-gw,y+3),INK,22,shadow=False)
+        if snap["activity"] is None:
+            if getattr(self,"control_mode","keyboard")=="live":
+                self.text("Muscle activity: EMG sensor not sending data",(x+10,y+27),BAD,17,shadow=False)
+            else:
+                self.text("Muscle activity: no EMG sensor in this mode",(x+10,y+27),MUTED,17,shadow=False)
+        elif self.effort_gated():
+            need=self.required_effort()
+            self.text("Grip effort",(x+10,y+27),MUTED,17,shadow=False)
+            _,colour=self.draw_activity_bar(x+118,y+31,130,snap["activity"],need=need)
+            self.text(f"{snap['activity']:.0f}% / need {need:.0f}%",(x+256,y+27),colour,18,shadow=False)
+        else:
+            self.text("Muscle activity",(x+10,y+27),MUTED,17,shadow=False)
+            level,colour=self.draw_activity_bar(x+118,y+31,130,snap["activity"])
+            self.text(f"{snap['activity']:.0f}% {level}",(x+256,y+27),colour,18,shadow=False)
+            rms=f"RMS {snap['rms']:.0f}"
+            self.text(rms,(x+w-10-self.get_font(16).size(rms)[0],y+28),MUTED,16,shadow=False)
+    def draw_action_cards(self):
+        """Cards that appear where an action happened (for example a balloon popping) and fade out."""
+        now=time.monotonic(); alive=[]; life=2.2
+        for c in self.cards:
+            age=now-c["born"]
+            if age>life: continue
+            alive.append(c)
+            alpha=int(255*min(1,(life-age)/0.6))
+            w,h=270,72
+            px,py=c["pos"] or (self.W//2,self.H//2)
+            rise=age*12
+            # Above the action point when there is room under the top bar, otherwise below it.
+            y=py-h-40-rise if py-h-40>=118 else py+40-rise
+            x=int(min(max(px-w//2,10),self.W-w-10)); y=int(min(max(y,118),self.H-h-40))
+            card=pygame.Surface((w,h),pygame.SRCALPHA)
+            pygame.draw.rect(card,(*PANEL,int(230*alpha/255)),card.get_rect(),border_radius=12)
+            pygame.draw.rect(card,(*(GOOD if c["ok"] else BAD),alpha),card.get_rect(),width=3,border_radius=12)
+            self.screen.blit(card,(x,y))
+            self.text(c["title"],(x+12,y+7),GOOD if c["ok"] else BAD,24,shadow=False,alpha=alpha)
+            how=f"{c['gesture']}  |  {c['source']}"
+            if c["confidence"]>0 and c["source"].startswith("Camera"): how+=f" {c['confidence']*100:.0f}%"
+            self.text(how,(x+12,y+31),INK,18,shadow=False,alpha=alpha)
+            if c["activity"] is None:
+                self.text("Muscle activity: no EMG sensor",(x+12,y+51),MUTED,17,shadow=False,alpha=alpha)
+            elif c.get("need") is not None:
+                self.text("Grip effort",(x+12,y+51),MUTED,17,shadow=False,alpha=alpha)
+                _,colour=self.draw_activity_bar(x+112,y+55,90,c["activity"],alpha,need=c["need"])
+                self.text(f"{c['activity']:.0f}% / {c['need']:.0f}%",(x+208,y+51),colour,17,shadow=False,alpha=alpha)
+            else:
+                self.text("Muscle activity",(x+12,y+51),MUTED,17,shadow=False,alpha=alpha)
+                level,colour=self.draw_activity_bar(x+112,y+55,90,c["activity"],alpha)
+                self.text(f"{c['activity']:.0f}% {level}",(x+208,y+51),colour,17,shadow=False,alpha=alpha)
+        self.cards=alive
+    def draw_grip_meter(self):
+        """While a fist is held but not yet strong enough, a small meter under the hand says so."""
+        g=self._grip
+        if not (g["active"] and g["ready"] and not g["fired"] and g["pos"] and self.effort_gated()): return
+        pct=self.emg_activity() or 0.0; need=self.required_effort()
+        x,y=int(g["pos"][0]),int(g["pos"][1])
+        # Under the hand, or above it when the hand is near the bottom of the screen.
+        y=y+58 if y+58+40<=self.H-36 else y-58-40
+        x=min(max(x-80,10),self.W-170); y=max(y,118)
+        self.panel((x,y,160,40),215,radius=9)
+        self.text("Squeeze harder",(x+80,y+11),GOLD,21,center=True,shadow=False)
+        self.draw_activity_bar(x+10,y+25,140,pct,need=need)
 
     # ------------------------------------------------------------ start, countdown, results
     def instructions(self):
@@ -399,6 +649,10 @@ class BaseGame:
                    ("Avg reaction",f"{summary['avg_reaction_ms']/1000:.1f} s" if summary["avg_reaction_ms"] else "-"),("Time played",f"{minutes}:{seconds:02d}"),
                    ("Level",f"{self.difficulty.start_level:.1f} -> {self.difficulty.level:.1f}" if self.difficulty.mode=="auto" else self.difficulty.label())]
             if best is not None and not new_best: stats.append(("Previous best",str(best)))
+            effort=[a["emg_activity_pct"] for a in self.attempts if a.get("correct") and a.get("emg_activity_pct") is not None]
+            if effort: stats.append(("Avg muscle activity",f"{sum(effort)/len(effort):.0f}% ({activity_level(sum(effort)/len(effort))})"))
+            grips=[a for a in self.attempts if a.get("effort_ok") is not None]
+            if grips: stats.append(("Strong grips",f"{sum(a['effort_ok'] for a in grips)} of {len(grips)} (need {grips[-1]['effort_required_pct']:.0f}%)"))
             x0,y0=card.x+40,card.y+178
             for i,(label,value) in enumerate(stats):
                 col,row=i%2,i//2; x=x0+col*260; y=y0+row*48

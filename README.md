@@ -61,7 +61,7 @@ src/               acquisition, preprocessing,   webapp/     RehabHub (React + T
                    evaluation, vision, fusion,   firmware/   ESP32 sketch
                    realtime, games, utils        config/     settings.yaml, labels.yaml
 Dataset/           EMG recordings                models/     fine-tuned MOMENT-1 runs
-docs/              documentation                 tests/      47 pytest tests
+docs/              documentation                 tests/      57 pytest tests
 ```
 
 `python -m pytest -q` runs the tests. Fine-tuning uses a separate environment (`.venv-finetune`, see [docs/fine_tuning_moment.md](docs/fine_tuning_moment.md)).

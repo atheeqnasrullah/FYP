@@ -45,6 +45,7 @@ const MOVEMENTS: Record<string, string> = {
   Pronation: 'Palm down',
   Rest: 'Rest',
   Missed: 'Missed',
+  Weak_Grip: 'Grip too weak',
 }
 
 /** Movement or shape label in plain words (Hand_Close -> Close hand). */

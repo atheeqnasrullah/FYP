@@ -47,6 +47,8 @@ Edit `config/settings.yaml`, or use the web app's Settings page.
 | `game_session_seconds` | 180 | Different session length; 0 = no limit |
 | `game_difficulty` | `auto` | Fixed `easy`, `medium` or `hard` |
 | `game_sound` / `game_show_screens` | true / true | Mute sound, or skip start and results screens |
+| `game_effort_required` | `auto` | Grip effort needed in Webcam + EMG mode: `auto` follows the difficulty (25-60%), or a fixed 0-100 (% of the patient's strongest squeeze); 0 = off |
+| `game_emg_calibration` | true | `false` skips the muscle check and reuses the patient's saved one |
 
 ## 3. Start the system
 
@@ -70,7 +72,9 @@ The older Streamlit dashboard still works: `streamlit run dashboard/dashboard.py
 | Webcam + EMG sensor | `python main.py live --game shape` | Webcam, ESP32 + MD0437 |
 | Webcam + EMG replay | `python main.py live --emg-source replay --game car` | Webcam; EMG comes from a recorded volunteer in `Dataset/` (`EMG_REPLAY_SUBJECT=S05` picks another) |
 
-Options: `--patient P02`, `--difficulty auto|easy|medium|hard`, `--duration 120` (seconds, 0 = no limit). Games are `balloon`, `car`, `treasure` and `shape`.
+Options: `--patient P02`, `--difficulty auto|easy|medium|hard`, `--duration 120` (seconds, 0 = no limit), `--effort auto|0-100` (Webcam + EMG: grip effort needed). Games are `balloon`, `car`, `treasure` and `shape`.
+
+**Webcam + EMG sessions start with a muscle check:** relax the hand for 3 s, then squeeze as hard as is comfortable for 3 s. From then on a pop, brake, gold grab or shape pick-up only counts when the grip reaches the effort needed (a share of that squeeze); a weaker fist shows "Squeeze harder". Press S during the check to reuse the patient's last one. Details: [games.md](games.md#grip-effort-threshold).
 
 **In every game:** Enter pauses, M mutes, Esc ends and saves the session.
 
@@ -78,15 +82,18 @@ Options: `--patient P02`, `--difficulty auto|easy|medium|hard`, `--duration 120`
 
 **Webcam controls:** see [games.md](games.md). In short: move the hand to aim or steer, make a full fist to grab, pop or brake, open the hand to release.
 
+**On screen:** the strip at the top right shows the input source, the gesture the game sees (with camera confidence) and muscle activity or grip effort; a card appears at every action saying what happened and what triggered it.
+
 ## 5. Sessions
 
-Each session ends with a results screen (score, accuracy, best streak, reaction time, stars, previous best) and is saved to the API. If the API is not running, it is queued in `data/logs/pending_sessions.jsonl` and uploaded on the next save, with the Dashboard's import button, or with the Streamlit sidebar button.
+Each session ends with a results screen (score, accuracy, best streak, reaction time, stars, previous best, muscle activity, strong grips) and is saved to the API. If the API is not running, it is queued in `data/logs/pending_sessions.jsonl` and uploaded on the next save, with the Dashboard's import button, or with the Streamlit sidebar button.
 
 ## 6. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
 | "Could not open a webcam" | Grant camera permission to the terminal/IDE (macOS: System Settings > Privacy & Security > Camera); close other camera apps; try another `camera_index` |
+| Balloons never pop in Webcam + EMG mode | The grip is below the effort needed (the strip shows "x% / need y%"): redo the muscle check with a real squeeze, check the electrodes, or lower *Grip effort needed* (or `--effort`) |
 | Game stuck on "Waiting for valid EMG sensor data" | Check `serial_port` and baud rate, close Arduino Serial Monitor, check the ESP32 is printing lines |
 | Web app shows errors or no data | Check the API is running and on the port the page uses; in dev mode the API must be on 8000 |
 | Sessions not appearing | Check `backend_url` matches the API port; import queued sessions from the Dashboard |

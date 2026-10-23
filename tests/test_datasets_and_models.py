@@ -8,10 +8,12 @@ from src.models.train_emg import subject_normalise, within_subject_split
 from src.utils.config import runtime_labels
 
 
-@pytest.mark.parametrize("source,subjects", [("healthy", 9), ("stroke_patient", 1)])
-def test_sources_load_all_gestures(source, subjects):
+# Minimum counts: new recordings are added over time (S10-S20 and SP02 arrived on 2026-10-22).
+@pytest.mark.parametrize("source,min_subjects", [("healthy", 9), ("stroke_patient", 1)])
+def test_sources_load_all_gestures(source, min_subjects):
     data = load_source(source)
-    assert data.subject_id.nunique() == subjects
+    assert data.subject_id.nunique() >= min_subjects
+    assert set(data.subject_id) == {f.name.split("_")[0] for f in __import__("src.data.public_datasets", fromlist=["files"]).files(source)} or source == "stroke_patient"
     assert sorted(data.label.unique()) == sorted(GESTURES)
     assert data.emg_value.notna().all() and data.emg_value.between(0, 4095).all()
     assert set(data.signal_type) == {"envelope"} and set(data.fs) == {FS}
@@ -23,7 +25,7 @@ def test_gestures_match_runtime_labels():
 
 def test_stroke_patient_is_kept_separate():
     data = load_source("stroke_patient")
-    assert set(data.cohort) == {"stroke_patient"} and data.subject_id.nunique() == 1
+    assert set(data.cohort) == {"stroke_patient"} and data.subject_id.nunique() >= 1
     assert not set(data.subject_id) & set(load_source("healthy").subject_id)
 
 
@@ -36,8 +38,10 @@ def test_build_public_features_uses_dataset_rate():
     features = build("stroke_patient")
     assert not features.empty and set(FEATURES) <= set(features.columns)
     assert features.groupby("trial_id").window_id.min().eq(0).all()
-    # 60 s at 100 Hz with 200 ms windows every 100 ms -> 599 windows per movement
-    assert features.groupby("label").size().eq(599).all()
+    # 100 Hz, 200 ms windows every 100 ms: a segment of n samples gives (n - 20) // 10 + 1 windows
+    samples = load_source("stroke_patient").groupby("trial_id").size()
+    expected = ((samples - 20) // 10 + 1).clip(lower=0)
+    assert features.groupby("trial_id").size().reindex(expected.index, fill_value=0).equals(expected)
 
 
 def test_within_subject_split_leaves_gap():

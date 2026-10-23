@@ -206,6 +206,7 @@ class Launch(BaseModel):
     patient_id: str
     difficulty: str = "auto"
     duration_s: int = Field(default=180, ge=0, le=3600)
+    effort: str = "auto"   # grip effort needed in Webcam + EMG modes: auto or 0-100 (% of the patient's strongest squeeze)
 
 
 def _status():
@@ -238,6 +239,11 @@ def launch(req: Launch):
         raise HTTPException(400, "Patient code must start with P and contain only letters, numbers, _ or - (up to 21 characters).")
     if req.difficulty not in DIFFICULTIES:
         raise HTTPException(400, "Difficulty must be auto, easy, medium or hard")
+    from src.games.effort import parse_required
+    try:
+        effort = parse_required(req.effort)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     if _status()["running"]:
         raise HTTPException(409, "A game is already running. Stop it before starting another.")
     # Close any live sensor/camera preview in the web app so the game can open the devices.
@@ -248,6 +254,8 @@ def launch(req: Launch):
                "--patient", req.patient_id.strip(), "--difficulty", req.difficulty, "--duration", str(req.duration_s)]
     if req.mode == "replay":
         command += ["--emg-source", "replay"]
+    if req.mode in ("live", "replay"):
+        command += ["--effort", "auto" if effort == "auto" else f"{effort:g}"]
     options = {"cwd": str(ROOT), "stdin": subprocess.DEVNULL}
     if sys.platform == "win32":
         options["creationflags"] = subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP
@@ -262,7 +270,7 @@ def launch(req: Launch):
         raise HTTPException(500, f"Could not start the game: {exc}")
     _running["proc"] = proc
     _running["info"] = {"game": req.game, "game_name": game["name"], "mode": req.mode, "patient_id": req.patient_id.strip(),
-                        "difficulty": req.difficulty, "duration_s": req.duration_s, "started_at": datetime.now(timezone.utc).isoformat(), "exit_code": None}
+                        "difficulty": req.difficulty, "duration_s": req.duration_s, "effort": req.effort, "started_at": datetime.now(timezone.utc).isoformat(), "exit_code": None}
     return _status()
 
 

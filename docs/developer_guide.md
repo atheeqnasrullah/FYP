@@ -4,7 +4,7 @@ How the code fits together, where to change things, and the rules that keep the 
 
 ## Design rules
 
-1. **The camera decides movements.** EMG is an activity measurement (RMS, MAV). No EMG classifier controls a game; `src/models/` is offline research only.
+1. **The camera decides movements.** EMG is an activity measurement (RMS, MAV). No EMG classifier controls a game; `src/models/` is offline research only. EMG can only hold an action back: in Webcam + EMG mode a grip the camera sees must also reach the patient's effort threshold.
 2. **One label vocabulary at runtime:** `config/labels.yaml`, read by `runtime_labels()` in `src/utils/config.py`. The keyboard map, simulator and games use these labels. Supination/Pronation exist only as keyboard keys for Treasure Hunt's lock.
 3. **Signal type and sample rate matter.** `envelope` skips the bandpass/notch; `raw` gets 20-450 Hz bandpass and 50 Hz notch. `fs` converts window milliseconds to samples, so it must match the data (1000 for the live ESP32, 100 for `Dataset/`).
 4. **Split by subject.** Evaluate EMG models leave-one-subject-out or on held-out subjects, never by random window: windows overlap by 50%.
@@ -31,7 +31,7 @@ How the code fits together, where to change things, and the rules that keep the 
 | `src/vision/hand_tracker.py` | MediaPipe wrapper, hand features, `rule_classify` |
 | `src/fusion/fusion_engine.py` | Confidence gate, majority smoothing, EMG attachment |
 | `src/realtime/` | `pipeline.py` (threads, `latest`, command bus), `simulator.py`, `emg_replay.py` |
-| `src/games/` | `game_engine.py` (`BaseGame`), four games, `difficulty.py`, `summary.py`, `audio.py` |
+| `src/games/` | `game_engine.py` (`BaseGame`), four games, `difficulty.py`, `effort.py` (grip effort threshold), `summary.py`, `audio.py` |
 | `src/utils/` | `config.py` (settings, labels, env overrides), `session_sync.py` |
 | `backend/app.py` | Session API and SQLite schema; mounts `webapi` and `/ui` |
 | `backend/webapi.py` | Web app endpoints: overview, patients, sessions, game launcher, datasets, settings |
@@ -43,9 +43,10 @@ How the code fits together, where to change things, and the rules that keep the 
 
 1. Subclass `BaseGame` in `src/games/`, set `name` and `how_to_play`, implement `run()`.
 2. Call `self.begin()` first (start screen, countdown, difficulty); each frame call `self.read_input()` and, in live mode, `self.wait_for_required_emg()`; read `self.cmd` and `latest["pointer"]`.
-3. Call `self.target_set(label)` when a new target appears and `self.log(detected)` when the player acts; `self.miss()` for failures that are not movements. Use `self.difficulty.value(easy, hard)` for every tunable.
-4. End with `self.save_session()`.
-5. Register it in `main.py` (`--game`), `backend/webapi.py` (`GAMES`) and `dashboard/dashboard.py` (`GAMES`), add a card image in `webapp/public/games/`, and add a headless test in `tests/test_games_headless.py`.
+3. Call `self.target_set(label)` when a new target appears and `self.log(detected, pos=(x, y), card=True)` when the player acts (the card shows what triggered it); `self.miss()` for failures that are not movements. Use `self.difficulty.value(easy, hard)` for every tunable.
+4. For a grip action, call `self.grip(closed, ready=<target available>, pos=(x, y))` every frame: act on `"fire"` (log with `grip=True`) and call `self.log_weak_grip()` on `"weak"`. Draw the frame with `self.present()` instead of `pygame.display.flip()` so the input strip, grip meter and cards appear on top.
+5. End with `self.save_session()`.
+6. Register it in `main.py` (`--game`), `backend/webapi.py` (`GAMES`) and `dashboard/dashboard.py` (`GAMES`), add a card image in `webapp/public/games/`, and add a headless test in `tests/test_games_headless.py`.
 
 ## Adding an API endpoint
 
@@ -58,13 +59,14 @@ Add it to `backend/webapi.py` (web app features) or `backend/app.py` (anything g
 | `EMG_SERIAL_PORT` | Overrides `serial_port` |
 | `REHAB_DB` | SQLite path for the API |
 | `REHAB_GAME_STATE` | Path of the per-patient difficulty file |
+| `REHAB_EMG_CALIBRATION` | Path of the per-patient muscle check file (default `data/logs/emg_calibration.json`) |
 | `REHAB_SKIP_SCREENS` | Skip start and results screens (tests) |
 | `EMG_REPLAY_SOURCE`, `EMG_REPLAY_SUBJECT` | Replay recording (default `healthy`, `S02`) |
 | `SDL_VIDEODRIVER=dummy`, `SDL_AUDIODRIVER=dummy` | Headless Pygame (tests) |
 
 ## Tests
 
-`python -m pytest -q` runs 47 tests, all passing. Fine-tuning code runs in `.venv-finetune` (`--smoke` checks it). See [testing_and_evaluation.md](testing_and_evaluation.md). Web app checks: `cd webapp && npm run lint && npm run build`.
+`python -m pytest -q` runs 57 tests, all passing. Fine-tuning code runs in `.venv-finetune` (`--smoke` checks it). See [testing_and_evaluation.md](testing_and_evaluation.md). Web app checks: `cd webapp && npm run lint && npm run build`.
 
 ## Git
 

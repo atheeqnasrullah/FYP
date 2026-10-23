@@ -40,6 +40,10 @@ export interface Attempt {
   emg_rms: number
   emg_mav: number
   confidence: number
+  input_source?: string | null
+  emg_activity_pct?: number | null
+  effort_required_pct?: number | null
+  effort_ok?: number | null
 }
 
 export interface MovementAccuracy {
@@ -91,6 +95,7 @@ export interface GameStatus {
     patient_id: string
     difficulty?: string
     duration_s?: number
+    effort?: string
     started_at: string
     exit_code: number | null
   } | null

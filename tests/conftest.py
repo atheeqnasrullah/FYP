@@ -9,4 +9,6 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 # adaptive difficulty levels written by tests out of data/logs.
 os.environ.setdefault("REHAB_SKIP_SCREENS", "1")
 import tempfile
-os.environ.setdefault("REHAB_GAME_STATE", os.path.join(tempfile.mkdtemp(prefix="rehab_test_"), "game_levels.json"))
+_state = tempfile.mkdtemp(prefix="rehab_test_")
+os.environ.setdefault("REHAB_GAME_STATE", os.path.join(_state, "game_levels.json"))
+os.environ.setdefault("REHAB_EMG_CALIBRATION", os.path.join(_state, "emg_calibration.json"))

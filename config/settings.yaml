@@ -22,3 +22,7 @@ game_session_seconds: 180   # session length; 0 = no time limit (--duration over
 game_difficulty: auto       # auto adapts to the patient, or easy / medium / hard
 game_sound: true            # sound effects (press M in a game to mute)
 game_show_screens: true     # start screen, countdown and results screen
+# Grip effort threshold (Webcam + EMG mode only): a pop, brake, gold grab or shape pick-up
+# counts only when the grip reaches this share of the patient's calibrated strongest squeeze.
+game_effort_required: auto  # auto follows the difficulty (25% easiest to 60% hardest), or a fixed 0-100; 0 = off (--effort overrides)
+game_emg_calibration: true  # relax-then-squeeze check at the start of each Webcam + EMG session; false reuses the patient's saved check

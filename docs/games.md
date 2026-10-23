@@ -18,17 +18,68 @@ Each game asks for one target movement at a time, logs every attempt as correct 
 | Treasure Hunt | Each step against the suggested shortest path; opening and grabbing at a chest | Chest +25; island cleared +50, then a new island |
 | Shape Matching | Each drop in a hole (right or wrong hole) | Round complete +20; dropping away from any hole is not counted |
 
-In Webcam + EMG mode every game also shows live EMG RMS and MAV (Car Driving adds a meter relative to the session peak) and pauses on a waiting screen when EMG data stops. These are electrical activity values, not strength scores.
+In Webcam + EMG mode a grip action also needs enough muscle effort (see [Grip effort threshold](#grip-effort-threshold)), and every game pauses on a waiting screen when EMG data stops.
+
+## Input feedback on screen
+
+Every game shows what drove each action, so the patient and therapist can see how the game read the hand:
+
+- **Input strip** (top right, under the timer): the input source (Keyboard, Simulator, Camera, Camera + EMG sensor, Camera + EMG replay), the gesture the game sees now with the camera's confidence, and a muscle bar. In Webcam + EMG mode the bar is **grip effort** with a white tick at the effort needed ("20% / need 50%"; yellow below the tick, green at or above it). In other modes it reads "no EMG sensor in this mode".
+- **Action cards** appear where something happened (a balloon pops, the car changes lane or brakes, a chest opens, a shape drops) and fade after about 2 s. Each card names the result ("Balloon popped!", "Wrong hole: circle", "Squeeze harder: 20% of 50%"), the gesture, the input source with confidence, and the effort bar. Green border: success; red: a miss or a grip that was too weak.
+- **"Squeeze harder" meter:** while a fist is held on a target but is not yet strong enough, a small effort bar with the tick appears next to the hand.
+
+Each attempt records `input_source` and `emg_activity_pct`; grip actions also record `effort_required_pct` and `effort_ok`. The results screen shows the average muscle activity of good movements and, in Webcam + EMG mode, **Strong grips** (how many grip attempts reached the threshold).
+
+## Grip effort threshold
+
+A fist seen by the camera is not enough on its own in Webcam + EMG mode: the grip must also reach a minimum muscle effort set for that patient. Without this, any EMG reading at all would let a balloon pop.
+
+**Muscle check (calibration).** After the start screen, a two-step check runs (`src/games/effort.py`, `BaseGame.calibration_screen`):
+
+1. *Relax your hand* for 3 s: the median EMG RMS is the patient's **rest** level.
+2. *Now squeeze!* for 3 s, as hard as is comfortable: the 90th percentile RMS is the patient's **strongest squeeze**.
+
+The first 0.8 s of each step is ignored while the hand settles. If the squeeze is not at least 5% above rest, the check repeats once, then falls back to the patient's saved check. A good check is saved per patient in `data/logs/emg_calibration.json`; press S during the check to reuse the saved one instead. With `game_emg_calibration: false` the saved check is reused without asking. With EMG replay the recording cannot follow instructions, so its own Rest windows (median) and Hand_Close windows (90th percentile) stand in, and nothing is saved for the patient.
+
+**Effort** is then the share of the patient's own range:
+
+```
+effort % = (RMS - rest) / (strongest - rest) x 100, clipped to 0-100
+```
+
+The MD0437 gives an activity envelope in ADC units, not a force, so this is relative effort, not strength in newtons. If no check exists, effort falls back to the share of the strongest reading so far in the session.
+
+**Effort needed** comes from `game_effort_required` in `config/settings.yaml`, `--effort` on the command line, or *Grip effort needed* in the web Game Launcher:
+
+| Setting | Effort needed |
+|---|---|
+| `auto` (default) | Follows the difficulty level: 25% at level 1 to 60% at level 5 (42.5% at medium). Auto difficulty lowers it after weak attempts and raises it after successes |
+| `20` to `65` (any 0-100) | Fixed share of the strongest squeeze |
+| `0` | Off: any fist the camera sees counts; effort is still recorded |
+
+**What is gated**, in Webcam + EMG mode only (keyboard, simulator and webcam-only modes have no EMG, so a fist counts at once):
+
+| Game | Grip action that needs the effort | A fist that never reaches it |
+|---|---|---|
+| Balloon Pop | Popping a balloon in reach (one pop per fist) | "Squeeze harder!" under the hand; on opening, a failed attempt `Weak_Grip` and a red card |
+| Car Driving | Braking (the car only slows while the grip is strong enough) | Card "Brake too weak: x% of y%"; not a scored attempt, because the targets are lanes |
+| Treasure Hunt | Grabbing the gold after the chest opens | Failed attempt `Weak_Grip`; the chest stays closed until a strong fist |
+| Shape Matching | Picking up a shape | Failed attempt `Weak_Grip`; the placement attempt records the effort used at pick-up |
+
+Opening the hand (Treasure Hunt's chest lock, releasing a shape) is not gated: it is judged by the camera, since the forearm sensor mainly reads the grip.
+
+One fist is one attempt. The fist fires once when it first reaches the threshold; a fist that opens without reaching it is logged once as `Weak_Grip` (target `Hand_Close`, incorrect), with its strongest moment as the effort.
 
 ## Session flow
 
 1. **Start screen:** how to play; start with Space or by holding an open hand.
-2. **Countdown:** 3-2-1.
-3. **Play:** timer at the top (180 s by default), a prompt naming the next movement, popups for streaks and level changes. Enter pauses (paused time is not counted), M mutes, Esc ends early.
-4. **Results:** score, accuracy, good movements per movement type, best streak, average reaction time, previous best, and 1-3 stars (3 stars at 80% accuracy or more, 2 at 50% or more).
-5. **Save:** upload to the API, or queue in `data/logs/pending_sessions.jsonl`; in auto mode the level is saved to `data/logs/game_levels.json`.
+2. **Muscle check** (Webcam + EMG mode only): relax 3 s, squeeze 3 s; see [Grip effort threshold](#grip-effort-threshold).
+3. **Countdown:** 3-2-1.
+4. **Play:** timer at the top (180 s by default), a prompt naming the next movement, popups for streaks and level changes. Enter pauses (paused time is not counted), M mutes, Esc ends early.
+5. **Results:** score, accuracy, good movements per movement type, best streak, average reaction time, previous best, average muscle activity, strong grips, and 1-3 stars (3 stars at 80% accuracy or more, 2 at 50% or more).
+6. **Save:** upload to the API, or queue in `data/logs/pending_sessions.jsonl`; in auto mode the level is saved to `data/logs/game_levels.json`.
 
-Session length, difficulty, sound and the start/results screens come from `game_session_seconds`, `game_difficulty`, `game_sound` and `game_show_screens` in `config/settings.yaml`, or from `--duration` and `--difficulty` on the command line or in the web app's Game Launcher.
+Session length, difficulty, sound and the start/results screens come from `game_session_seconds`, `game_difficulty`, `game_sound` and `game_show_screens` in `config/settings.yaml`, or from `--duration` and `--difficulty` on the command line or in the web app's Game Launcher. In Webcam + EMG mode the muscle check runs between the start screen and the countdown.
 
 ## Adaptive difficulty
 
@@ -61,7 +112,8 @@ Each game turns the level into concrete parameters, interpolated linearly from l
 
 | File | Role |
 |---|---|
-| `src/games/game_engine.py` | `BaseGame`: input, scoring, streaks, timer, pause, start/results screens, session save, latency log |
+| `src/games/game_engine.py` | `BaseGame`: input, scoring, streaks, timer, pause, start/results screens, input strip and action cards, muscle check and grip gate (`grip()`, `effort_ok()`, `log_weak_grip()`), session save, latency log |
+| `src/games/effort.py` | Calibration maths, effort %, effort needed, per-patient calibration file |
 | `src/games/difficulty.py` | Levels, presets, auto adaptation, per-patient memory |
 | `src/games/summary.py` | Results summary, stars, encouragement text |
 | `src/games/audio.py` | Synthesised sound effects |

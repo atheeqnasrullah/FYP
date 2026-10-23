@@ -173,7 +173,7 @@ class BalloonPop(BaseGame):
         return self.difficulty.value(1.6, 1.0)
 
     def run(self):
-        clock=pygame.time.Clock(); x=self.W//2; player_y=self.H//2; balloons=[]; fragments=[]; bursts=[]; scores=[]; last_spawn=0; last_action=0; was_closed=False
+        clock=pygame.time.Clock(); x=self.W//2; player_y=self.H//2; balloons=[]; fragments=[]; bursts=[]; scores=[]; last_spawn=0; last_action=0
         palette=((235,70,95),(70,165,245),(255,150,60),(165,105,230),(70,205,155))
         clouds=[[random.uniform(0,self.W),random.uniform(90,320),random.uniform(14,24),random.uniform(.15,.4)] for _ in range(5)]
         popped=missed=spawned=0; self.state="aim"
@@ -248,18 +248,23 @@ class BalloonPop(BaseGame):
             # while the sensor is disconnected, but require a fresh complete
             # EMG feature window before a fist can trigger a balloon pop.
             closed=full_fist and (mode!="live" or sensor_ready)
-            if closed and not was_closed and now-last_action>250 and in_reach is not None:
+            # One pop per fist, and in Webcam + EMG mode only once the grip reaches the patient's required effort.
+            grip=self.grip(closed,ready=in_reach is not None and now-last_action>250,pos=(x,player_y))
+            if grip=="weak":
+                self.log_weak_grip(); self.target_set("Hand_Close")
+            if grip=="fire":
                 hit=in_reach
                 hit["state"]="expanding"; hit["hit_at"]=now; hit["x"]=drift(hit)
-                self.log("Hand_Close"); self.target_set("Hand_Close"); last_action=now; popped+=1
+                self.log("Hand_Close",pos=(hit["x"],hit["y"]),title="Golden balloon popped!" if hit["golden"] else "Balloon popped!",card=True,grip=True)
+                self.target_set("Hand_Close"); last_action=now; popped+=1
                 bonus=20 if hit["golden"] else 0
                 self.score+=bonus
                 scores.append({"x":hit["x"],"y":hit["y"],"text":f"+{10+bonus+(5 if self.streak>=3 else 0)}","color":(255,214,92) if hit["golden"] else (255,255,255),"born":now})
                 bursts.append({"x":hit["x"],"y":hit["y"],"color":hit["color"],"created":now,"duration":430})
                 self.sound("chest" if hit["golden"] else "pop")
                 if hit["golden"]: self.popup("Golden balloon! +20 bonus",(255,214,92),36)
-            was_closed=closed
-            self.state="reopen" if closed and now-last_action<1500 and last_action else ("ready" if in_reach is not None else "aim")
+            if closed and in_reach is not None and not self._grip["fired"] and not self.effort_ok(): self.state="harder"
+            else: self.state="reopen" if closed and now-last_action<1500 and last_action else ("ready" if in_reach is not None else "aim")
 
             for balloon in list(balloons):
                 if balloon["state"]=="expanding" and now-balloon["hit_at"]>=160:
@@ -314,7 +319,7 @@ class BalloonPop(BaseGame):
             hand_color=(255,120,96) if closed else (255,226,110)
             draw_dashed_ring(self.screen,(x,player_y),int(reach+30),(255,255,255) if in_reach is None else (120,255,170),now)
             draw_hand(self.screen,x,player_y,closed,hand_color)
-            label={"reopen":"Open your hand","ready":"Make a fist!"}.get(self.state)
+            label={"reopen":"Open your hand","ready":"Make a fist!","harder":"Squeeze harder!"}.get(self.state)
             if label:
                 font=self.get_font(26); width=font.size(label)[0]+20
                 bubble=pygame.Rect(x-width//2,player_y+int(reach+30)+8,width,30)
@@ -329,11 +334,7 @@ class BalloonPop(BaseGame):
                 lines.append(("Show your hand to the camera",(255,220,110)))
             if mode=="live" and not sensor_ready:
                 lines.append(("Aim with your hand; popping is paused until fresh EMG data arrives",(255,220,110)))
-            if emg_level is not None:
-                lines.append((f"EMG activity: RMS {self.emg_rms:.1f} | MAV {self.emg_mav:.1f}",(210,245,225)))
-            elif mode=="live":
-                lines.append(("EMG activity: sensor unavailable",(255,210,130)))
             self.info(lines)
-            pygame.display.flip();clock.tick(30)
+            self.present();clock.tick(30)
             if pygame.key.get_pressed()[pygame.K_ESCAPE]:self.running=False
         self.save_session()

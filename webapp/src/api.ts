@@ -86,8 +86,8 @@ export const api = {
 
   games: () => request<GamesInfo>('/games'),
   gameStatus: () => request<GameStatus>('/games/status'),
-  launchGame: (game: string, mode: string, patient_id: string, difficulty: string, duration_s: number) =>
-    request<GameStatus>('/games/launch', json('POST', { game, mode, patient_id, difficulty, duration_s })),
+  launchGame: (game: string, mode: string, patient_id: string, difficulty: string, duration_s: number, effort = 'auto') =>
+    request<GameStatus>('/games/launch', json('POST', { game, mode, patient_id, difficulty, duration_s, effort })),
   stopGame: () => request<GameStatus & { message: string }>('/games/stop', json('POST')),
   gameLog: () => request<{ lines: string[] }>('/games/log'),
 

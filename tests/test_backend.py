@@ -53,3 +53,19 @@ def test_web_launcher_offers_emg_replay(client):
     info = client.get("/games").json()
     assert "replay" in info["modes"]
     assert all("replay" in game["modes"] for game in info["games"])
+
+
+def test_grip_effort_is_stored_and_exported(client):
+    client.post("/patients", json={"patient_id": "P04"})
+    weak = {**ATTEMPT, "target_movement": "Hand_Close", "detected_movement": "Weak_Grip", "correct": False,
+            "input_source": "Camera + EMG sensor", "emg_activity_pct": 22.0, "effort_required_pct": 45.0, "effort_ok": False}
+    sid = client.post("/sessions", json={"patient_id": "P04", "game_name": "Balloon_Pop", "total_score": 0, "duration_s": 5, "attempts": [weak, ATTEMPT]}).json()["session_id"]
+    rows = client.get(f"/sessions/{sid}/attempts").json()
+    assert rows[0]["effort_required_pct"] == 45 and rows[0]["effort_ok"] == 0 and rows[0]["input_source"] == "Camera + EMG sensor"
+    assert rows[1]["effort_ok"] is None                        # not a grip action
+    assert "effort_required_pct" in client.get("/patients/P04/export.csv").text.splitlines()[0]
+
+
+def test_web_launcher_rejects_bad_effort(client):
+    r = client.post("/games/launch", json={"game": "balloon", "mode": "live", "patient_id": "P01", "effort": "150"})
+    assert r.status_code == 400 and "0 to 100" in r.json()["detail"]

@@ -11,6 +11,7 @@ FRIENDLY = {
     "Supination": "Turn palm up",
     "Pronation": "Turn palm down",
     "Rest": "Rest",
+    "Weak_Grip": "Grip too weak",
 }
 
 

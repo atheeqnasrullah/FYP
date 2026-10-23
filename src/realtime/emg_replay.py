@@ -15,7 +15,7 @@ from src.features.emg_features import extract
 REPLAY_BATCH_MS = 10
 
 
-def replay_signal(source=None, subject=None):
+def replay_part(source=None, subject=None):
     from src.data.public_datasets import load_source
     source = source or os.environ.get("EMG_REPLAY_SOURCE", "healthy")
     data = load_source(source)
@@ -24,7 +24,31 @@ def replay_signal(source=None, subject=None):
     subject = subject or os.environ.get("EMG_REPLAY_SUBJECT") or default
     part = data[data.subject_id == subject]
     if part.empty: raise ValueError(f"No replay data for subject {subject} in {source}")
-    return part.emg_value.to_numpy(float), part.signal_type.iloc[0], f"{source}/{subject}", int(part.fs.iloc[0])
+    return part, f"{source}/{subject}"
+
+
+def replay_signal(source=None, subject=None):
+    part, name = replay_part(source, subject)
+    return part.emg_value.to_numpy(float), part.signal_type.iloc[0], name, int(part.fs.iloc[0])
+
+
+def replay_calibration(source=None, subject=None):
+    """(rest, strongest) RMS of the replayed recording: median of its Rest windows, 90th percentile of its Hand_Close windows.
+
+    Stands in for the relax-then-squeeze check, which a recording cannot follow."""
+    from src.games.effort import calibrate
+    cfg = load_settings()
+    part, _ = replay_part(source, subject)
+    fs = int(part.fs.iloc[0]); width = round(fs * cfg["window_ms"] / 1000); step = round(fs * cfg["step_ms"] / 1000)
+    def rms(label):
+        values = []
+        for _, trial in part[part.label == label].groupby("trial_id"):
+            x = trial.emg_value.to_numpy(float); x = x[np.isfinite(x)]
+            values += [extract(x[i:i + width], part.signal_type.iloc[0])["RMS"] for i in range(0, len(x) - width + 1, step)]
+        return values
+    result = calibrate(rms("Rest") or rms("Hand_Open"), rms("Hand_Close"))
+    if result is None: raise ValueError("the recording's Hand_Close is not stronger than its Rest")
+    return result
 
 
 def replay_emg(source=None, subject=None):

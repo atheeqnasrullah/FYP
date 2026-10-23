@@ -199,7 +199,9 @@ class CarDriving(BaseGame):
             return
         moved = "Left" if new_lane < self.lane else "Right"
         if self.lane != self.target_lane:
-            self.log(moved)
+            right_way = moved == self.target
+            self.log(moved, pos=(self.lane_x(new_lane, self.CAR_Y), self.CAR_Y),
+                     title=f"Steered {moved.lower()}" if right_way else f"Wrong way: {moved.lower()}", card=True)
         self.lane = new_lane
         if self.lane != self.target_lane:
             self.target_set("Left" if self.target_lane < self.lane else "Right")
@@ -335,7 +337,6 @@ class CarDriving(BaseGame):
         last_cmd = None
         collision_until = 0
         caught = 0
-        emg_peak = 1.0
         self.begin()
         self.new_target()
 
@@ -355,18 +356,30 @@ class CarDriving(BaseGame):
             hand_x = pointer[0] if (camera and pointer is not None) else None
             if camera:
                 gesture = visual[0] if visual is not None else "Rest"
-                braking = fist or gesture == "Hand_Close"
-                self.cmd = "Hand_Close" if braking else gesture
-                if hand_x is not None and not braking:
+                closed = fist or gesture == "Hand_Close"
+                self.cmd = "Hand_Close" if closed else gesture
+                if hand_x is not None and not closed:
                     self.change_lane(self.zone_lane(hand_x, self.lane))
             else:
-                braking = self.cmd == "Hand_Close"
+                closed = self.cmd == "Hand_Close"
                 if self.cmd in ("Left", "Right") and self.cmd != last_cmd:
                     self.change_lane(max(0, min(self.LANES - 1, self.lane + (-1 if self.cmd == "Left" else 1))))
                 last_cmd = self.cmd
             self.emg_rms = float((emg_features or {}).get("RMS", emg_level or 0.0))
             self.emg_mav = float((emg_features or {}).get("MAV", 0.0))
-            emg_peak = max(emg_peak, self.emg_rms, 1.0)
+            # The brakes only bite while the grip is at the required effort (Webcam + EMG mode).
+            # Braking is not a scored attempt (targets are lanes), so it gets a card, not a log entry.
+            braking = closed and self.effort_ok()
+            car_pos = (self.lane_x(self.lane, self.CAR_Y), self.CAR_Y)
+            # The grip meter sits above the car, clear of the lane panel.
+            grip = self.grip(closed, pos=(car_pos[0], self.CAR_Y - 140))
+            if grip == "fire" and self.effort_gated():
+                self.action_card("Braking", car_pos, True, need=self.required_effort())
+            elif grip == "weak":
+                cmd, self.cmd = self.cmd, "Hand_Close"   # the card names the fist, though the hand has opened
+                self.action_card(f"Brake too weak: {self.weak_grip['best']:.0f}% of {self.required_effort():.0f}%", car_pos, False,
+                                 self.weak_grip["best"], self.required_effort())
+                self.cmd = cmd
 
             # Difficulty sets top speed and how often other vehicles appear.
             max_speed = self.difficulty.value(3.5, 7.5)
@@ -442,20 +455,11 @@ class CarDriving(BaseGame):
                 self.text("BRAKING", (int(car_x), self.CAR_Y - 70), (255, 110, 90), 34, center=True)
 
             self.hud()
-            lines = [f"Stars caught {caught}   Distance {distance * 0.05:.2f} km"]
-            if camera and emg_level is not None:
-                percent = min(100, int(self.emg_rms / emg_peak * 100))
-                lines.append((f"EMG RMS {self.emg_rms:.1f}   MAV {self.emg_mav:.1f}   Activity {percent}% of session peak", (210, 245, 225)))
-                y = self.info(lines)
-                pygame.draw.rect(self.screen, (36, 42, 48), (16, y + 2, 180, 10), border_radius=5)
-                pygame.draw.rect(self.screen, (57, 208, 142), (16, y + 2, int(180 * percent / 100), 10), border_radius=5)
-            else:
-                if getattr(self, "control_mode", "keyboard") == "live":
-                    lines.append(("EMG activity sensor unavailable", (255, 210, 130)))
-                self.info(lines)
+            # Muscle activity is shown by the engine's input strip (BaseGame.draw_input_strip).
+            self.info([f"Stars caught {caught}   Distance {distance * 0.05:.2f} km"])
             self.draw_steering_bar(hand_x, camera)
             self.draw_speedometer(speed, max_speed)
-            pygame.display.flip()
+            self.present()
             clock.tick(30)
             if pygame.key.get_pressed()[pygame.K_ESCAPE]:
                 self.running = False

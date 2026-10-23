@@ -21,6 +21,15 @@ const DURATIONS = [
   { value: 600, label: '10 min' },
   { value: 0, label: 'No limit' },
 ]
+const EFFORTS = [
+  { value: 'auto', label: 'Auto' },
+  { value: '20', label: '20%' },
+  { value: '35', label: '35%' },
+  { value: '50', label: '50%' },
+  { value: '65', label: '65%' },
+  { value: '0', label: 'Off' },
+]
+const EFFORT_MODES = ['live', 'replay']
 const MODE_HELP: Record<string, string> = {
   vision: 'The webcam follows the hand; its picture appears behind the game.',
   live: 'Webcam controls the game; the EMG sensor adds muscle-activity readings. The game waits for sensor data.',
@@ -45,6 +54,7 @@ export default function Games() {
   const [mode, setMode] = useState('vision')
   const [difficulty, setDifficulty] = useState('auto')
   const [duration, setDuration] = useState(180)
+  const [effort, setEffort] = useState('auto')
   const [patient, setPatient] = useState(params.get('patient') ?? '')
   const [busy, setBusy] = useState(false)
   const [now, setNow] = useState(Date.now())
@@ -76,7 +86,7 @@ export default function Games() {
   const start = async () => {
     setBusy(true)
     try {
-      await api.launchGame(game, mode, patient, difficulty, duration)
+      await api.launchGame(game, mode, patient, difficulty, duration, effort)
       toast(`${selected?.name} started: play in the game window on this computer`, 'good')
       status.reload()
     } catch (e) {
@@ -117,6 +127,7 @@ export default function Games() {
             <p className="muted">
               {info.data?.modes[last.mode]} · {DIFFICULTY[last.difficulty ?? 'auto']?.label ?? last.difficulty} ·{' '}
               {last.duration_s ? `${Math.round(last.duration_s / 60)} min session` : 'no time limit'}
+              {EFFORT_MODES.includes(last.mode) && last.effort && ` · grip ${last.effort === 'auto' ? 'auto' : last.effort === '0' ? 'off' : `${last.effort}%`}`}
             </p>
             <p className="small muted">In the game window: Enter pauses, M mutes, Esc finishes early and saves.</p>
           </div>
@@ -224,6 +235,25 @@ export default function Games() {
                   ))}
                 </div>
               </label>
+              {EFFORT_MODES.includes(mode) && (
+                <label>
+                  <span className="field-label">Grip effort needed</span>
+                  <div className="segmented">
+                    {EFFORTS.map((e) => (
+                      <button key={e.value} type="button" className={e.value === effort ? 'active' : ''} onClick={() => setEffort(e.value)}>
+                        {e.label}
+                      </button>
+                    ))}
+                  </div>
+                  <small className="muted">
+                    {effort === 'auto'
+                      ? 'A pop, brake, gold grab or shape pick-up counts only above a share of the patient’s strongest squeeze (measured at the start); Auto raises it from 25% to 60% as the level rises.'
+                      : effort === '0'
+                        ? 'No minimum: any fist the camera sees counts. Effort is still recorded.'
+                        : `A grip action counts only at ${effort}% or more of the patient’s strongest squeeze, measured at the start of the session.`}
+                  </small>
+                </label>
+              )}
             </div>
             <HardwareCheck mode={mode} disabled={!!running} />
           </Card>

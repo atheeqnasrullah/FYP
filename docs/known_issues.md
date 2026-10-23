@@ -15,6 +15,7 @@ Checked against the code and data on 2026-10-18 (branch `main`). Issues are thin
 | 7 | No front-end tests for RehabHub | Web regressions are found by hand | Add component tests (for example Vitest) |
 | 8 | `npm run lint` reports 4 `react-refresh/only-export-components` warnings | Only affects hot reload in development | Move shared helpers out of component files |
 | 9 | The patient file changed from the generated `SYN_STROKE_01` to `SP01` on 2026-10-18; its origin (real or generated) is not documented | Patient results (now computed on `SP01`) cannot be called clinical | Confirm and document `SP01`'s origin |
+| 10 | The grip effort threshold (auto 25-60% of the strongest squeeze) is a starting guess; it has not been tried with patients | The default may be too hard or too easy for some patients | Check it in the usability study; the therapist can set a fixed value or turn it off per session |
 
 ## Fixed (2026-10-18 to 2026-10-21)
 
@@ -30,7 +31,7 @@ Checked against the code and data on 2026-10-18 (branch `main`). Issues are thin
 ## Limitations
 
 - **Single EMG channel:** it separates activity levels (Rest, Hand_Open, Hand_Close) but not directions (Left/Right/Up/Down near chance), so EMG never controls the games.
-- **EMG is not strength:** RMS/MAV are envelope values in ADC units, not calibrated force.
+- **EMG is not strength:** RMS/MAV are envelope values in ADC units, not calibrated force. The grip threshold is relative to each patient's own squeeze, not a force in newtons, and the squeeze depends on electrode placement on the day.
 - **No confirmed patient data:** one patient file (`SP01`, origin to be confirmed; it replaced a generated patient); no clinical claim can be made.
 - **No accounts or communication:** no login, no patient-therapist messaging, no reminders or report generation.
 - **Local only:** the API has no authentication; the Settings page can rewrite `config/settings.yaml` for anyone who can reach the API. Keep it on `127.0.0.1`.

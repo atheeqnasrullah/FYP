@@ -209,3 +209,127 @@ def test_treasure_hunt_hand_joystick_needs_return_to_centre():
     assert game.joystick((0.5, 0.5)) is None
     assert game.joystick((0.5, 0.5 + (reach + 0.05) / 0.75)) == "Down"
     import pygame; pygame.quit()
+
+
+def test_balloon_pop_shows_what_triggered_it(monkeypatch):
+    import src.games.balloon_pop as balloon
+    monkeypatch.setattr(balloon.random, "randint", lambda a, b: (a + b) // 2)
+    shown = []
+    original = engine.BaseGame.action_card
+    monkeypatch.setattr(engine.BaseGame, "action_card", lambda self, *a, **k: (shown.append(a), original(self, *a, **k)))
+    script = lambda f: "Down" if f < 70 else every(10, "Hand_Close")(f)
+    game, saved = run_game(balloon.BalloonPop, script, monkeypatch, frames=180)
+    pops = [a for a in saved["attempts"] if a["correct"]]
+    assert pops and all(a["input_source"] == "Keyboard" and a["emg_activity_pct"] is None for a in pops)
+    assert shown and shown[0][0] in ("Balloon popped!", "Golden balloon popped!")
+
+
+def test_input_feedback_reports_source_gesture_and_relative_activity(monkeypatch):
+    from src.games.car_driving import CarDriving
+    game = CarDriving(queue.Queue(), "P01")
+    game.control_mode = "live"; game.emg_source = "replay"
+    game.cmd, game.confidence = "Hand_Close", 0.9
+    game.emg_rms = 400.0; first = game.input_snapshot()
+    game.emg_rms = 200.0; second = game.input_snapshot()
+    assert first["source"] == "Camera + EMG replay" and first["gesture"] == "Close hand"
+    assert first["activity"] == 100 and second["activity"] == 50       # relative to the session's strongest
+    assert engine.activity_level(80) == "High" and engine.activity_level(50) == "Medium" and engine.activity_level(10) == "Low"
+    game.emg_rms = 0.0
+    assert game.input_snapshot()["activity"] is None                   # no EMG reading -> no activity shown
+    game.action_card("Steered left", (300, 400), True)
+    game.draw_input_strip(); game.draw_action_cards()                  # draws without errors
+    assert game.cards and game.cards[0]["title"] == "Steered left"
+    import pygame; pygame.quit()
+
+
+def run_live_balloon(monkeypatch, rms, effort=50, frames=200):
+    """Balloon Pop in Webcam + EMG mode: hand still at the centre, fist closing and opening, a fixed EMG RMS."""
+    import src.games.balloon_pop as balloon
+    import src.realtime.pipeline as pipeline
+    monkeypatch.setattr(balloon.random, "randint", lambda a, b: (a + b) // 2)
+    monkeypatch.setattr(pipeline, "emg_is_ready", lambda now=None: True)
+    monkeypatch.setattr(engine, "load_calibration", lambda patient: {"rest_rms": 100.0, "max_rms": 1100.0})
+    for key, value in {"pointer": (0.5, 0.5), "emg_features": {"RMS": rms, "MAV": rms}, "fist": False}.items():
+        monkeypatch.setitem(pipeline.latest, key, value)
+    def script(frame):
+        pipeline.latest["fist"] = frame % 20 < 10
+        return "Rest"
+    saved = {}
+    monkeypatch.setattr(engine, "upload_session", lambda base, payload: saved.update(payload))
+    monkeypatch.setattr(engine, "sync_pending_sessions", lambda base: (0, 0))
+    game = balloon.BalloonPop(queue.Queue(), "P01")
+    game.control_mode = "live"; game.effort_setting = effort
+    original = game.read_input
+    state = {"frame": 0}
+    def scripted():
+        original()
+        frame = state["frame"]; state["frame"] += 1
+        game.cmd = script(frame)
+        if frame >= frames: game.running = False
+    game.read_input = scripted
+    game.run()
+    return saved
+
+
+def test_live_balloon_weak_grip_does_not_pop(monkeypatch):
+    # RMS 300 with rest 100 and strongest 1100 is 20% effort, below the 50% required.
+    saved = run_live_balloon(monkeypatch, rms=300.0)
+    assert not any(a["correct"] for a in saved["attempts"]) and saved["total_score"] == 0
+    weak = [a for a in saved["attempts"] if a["detected_movement"] == "Weak_Grip"]
+    assert weak and all(a["effort_ok"] is False and a["effort_required_pct"] == 50 and a["emg_activity_pct"] == 20 for a in weak)
+
+
+def test_live_balloon_strong_grip_pops(monkeypatch):
+    # RMS 900 is 80% effort, above the 50% required.
+    saved = run_live_balloon(monkeypatch, rms=900.0)
+    pops = [a for a in saved["attempts"] if a["correct"]]
+    assert pops and all(a["effort_ok"] is True and a["emg_activity_pct"] == 80 for a in pops)
+    assert not any(a["detected_movement"] == "Weak_Grip" for a in saved["attempts"])
+
+
+def test_effort_threshold_off_lets_any_grip_pop(monkeypatch):
+    saved = run_live_balloon(monkeypatch, rms=300.0, effort=0)
+    assert any(a["correct"] for a in saved["attempts"])
+    assert all(a["effort_ok"] is None for a in saved["attempts"])
+
+
+def test_grip_fires_once_per_fist_and_only_when_strong_enough():
+    from src.games.car_driving import CarDriving
+    game = CarDriving(queue.Queue(), "P01")
+    game.control_mode = "live"; game.effort_setting = 40
+    game.calibration = {"rest_rms": 0.0, "max_rms": 1000.0}
+    game.emg_rms = 200.0
+    assert game.grip(True) is None                      # 20%: not yet
+    game.emg_rms = 450.0
+    assert game.grip(True) == "fire"                    # 45%: fires once
+    assert game.grip(True) is None                      # still the same fist
+    assert game.grip(False) is None                     # opened after firing: not weak
+    game.emg_rms = 300.0
+    game.grip(True)
+    assert game.grip(False) == "weak" and game.weak_grip["best"] == 30
+    assert game.grip(True, ready=False) is None and game.grip(False) is None   # nothing to act on: neither
+    game.control_mode = "vision"; game.emg_rms = 0.0
+    assert game.grip(True) == "fire"                    # no EMG in vision mode: the camera fist is enough
+    import pygame; pygame.quit()
+
+
+def test_calibration_and_required_effort(tmp_path, monkeypatch):
+    from src.games import effort
+    from src.games.difficulty import Difficulty
+    assert effort.calibrate([100, 110, 90], [900, 1000, 1100, 950]) == (100.0, pytest.approx(1070.0))
+    assert effort.calibrate([500, 500], [505, 510]) is None             # no real squeeze
+    assert effort.effort_pct(600, 100, 1100) == 50 and effort.effort_pct(50, 100, 1100) == 0 and effort.effort_pct(2000, 100, 1100) == 100
+    assert effort.parse_required("auto") == "auto" and effort.parse_required("35%") == 35
+    with pytest.raises(ValueError): effort.parse_required(150)
+    easy, hard = Difficulty("easy", "P01", "T"), Difficulty("hard", "P01", "T")
+    assert effort.required_effort("auto", easy) < effort.required_effort("auto", hard) and effort.required_effort(30, hard) == 30
+    monkeypatch.setenv("REHAB_EMG_CALIBRATION", str(tmp_path / "cal.json"))
+    assert effort.load_calibration("P07") is None
+    effort.save_calibration("P07", 120, 980, "sensor")
+    assert effort.load_calibration("P07")["max_rms"] == 980 and effort.load_calibration("P08") is None
+
+
+def test_replay_calibration_uses_the_recordings_rest_and_fist():
+    from src.realtime.emg_replay import replay_calibration
+    rest, peak = replay_calibration("healthy", "S02")
+    assert 0 < rest < peak

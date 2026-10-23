@@ -33,14 +33,22 @@ with closing(connect()) as c:
         c.execute("ALTER TABLE attempts ADD COLUMN emg_mav REAL NOT NULL DEFAULT 0.0")
     if "vision_label" not in attempt_columns:
         c.execute("ALTER TABLE attempts ADD COLUMN vision_label TEXT")
+    # Input feedback and the grip effort threshold (Webcam + EMG mode).
+    for column,kind in (("input_source","TEXT"),("emg_activity_pct","REAL"),("effort_required_pct","REAL"),("effort_ok","INTEGER")):
+        if column not in attempt_columns: c.execute(f"ALTER TABLE attempts ADD COLUMN {column} {kind}")
     c.commit()
 
 class Patient(BaseModel): patient_id:str=Field(pattern=r"^P[A-Za-z0-9_-]{1,20}$"); age:int|None=Field(default=None,ge=0,le=120); affected_side:str|None=None; stroke_date:str|None=None; notes:str|None=None
-class Attempt(BaseModel): ts:str|None=None; target_movement:str; detected_movement:str; vision_label:str|None=None; correct:bool; reaction_time_ms:int=Field(ge=0); emg_rms:float=0.; emg_mav:float=0.; confidence:float=0.
+class Attempt(BaseModel): ts:str|None=None; target_movement:str; detected_movement:str; vision_label:str|None=None; correct:bool; reaction_time_ms:int=Field(ge=0); emg_rms:float=0.; emg_mav:float=0.; confidence:float=0.; input_source:str|None=None; emg_activity_pct:float|None=None; effort_required_pct:float|None=None; effort_ok:bool|None=None
 class SessionStart(BaseModel): patient_id:str; game_name:str
 class AttemptBatch(BaseModel): attempts:list[Attempt]=Field(default_factory=list)
 class SessionClose(BaseModel): total_score:int; duration_s:int=Field(ge=0)
 class Session(BaseModel): patient_id:str; game_name:str; total_score:int; duration_s:int=Field(ge=0); attempts:list[Attempt]=Field(default_factory=list)
+
+def insert_attempts(c,sid,attempts):
+    c.executemany("INSERT INTO attempts(session_id,ts,target_movement,detected_movement,vision_label,correct,reaction_time_ms,emg_rms,emg_mav,confidence,input_source,emg_activity_pct,effort_required_pct,effort_ok) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [(sid,a.ts or datetime.now(timezone.utc).isoformat(),a.target_movement,a.detected_movement,a.vision_label,int(a.correct),a.reaction_time_ms,a.emg_rms,a.emg_mav,a.confidence,
+          a.input_source,a.emg_activity_pct,a.effort_required_pct,None if a.effort_ok is None else int(a.effort_ok)) for a in attempts])
 
 @app.get("/health")
 def health(): return {"status":"ok"}
@@ -63,7 +71,7 @@ def create_session(s:Session):
         acc=sum(a.correct for a in s.attempts)/len(s.attempts) if s.attempts else 0.
         now=datetime.now(timezone.utc).isoformat()
         cur=c.execute("INSERT INTO sessions(patient_id,game_name,started_at,ended_at,total_score,duration_s,accuracy) VALUES(?,?,?,?,?,?,?)",(s.patient_id,s.game_name,now,now,s.total_score,s.duration_s,acc)); sid=cur.lastrowid
-        c.executemany("INSERT INTO attempts(session_id,ts,target_movement,detected_movement,vision_label,correct,reaction_time_ms,emg_rms,emg_mav,confidence) VALUES(?,?,?,?,?,?,?,?,?,?)",[(sid,a.ts or datetime.now(timezone.utc).isoformat(),a.target_movement,a.detected_movement,a.vision_label,int(a.correct),a.reaction_time_ms,a.emg_rms,a.emg_mav,a.confidence) for a in s.attempts]); c.commit()
+        insert_attempts(c,sid,s.attempts); c.commit()
     return {"session_id":sid,"accuracy":acc}
 
 @app.post("/sessions/start")
@@ -79,7 +87,7 @@ def upload_attempts(sid:int,batch:AttemptBatch):
         session=c.execute("SELECT ended_at FROM sessions WHERE session_id=?",(sid,)).fetchone()
         if not session: raise HTTPException(404,"Session not found")
         if session["ended_at"] is not None: raise HTTPException(409,"Session is already closed")
-        c.executemany("INSERT INTO attempts(session_id,ts,target_movement,detected_movement,vision_label,correct,reaction_time_ms,emg_rms,emg_mav,confidence) VALUES(?,?,?,?,?,?,?,?,?,?)",[(sid,a.ts or datetime.now(timezone.utc).isoformat(),a.target_movement,a.detected_movement,a.vision_label,int(a.correct),a.reaction_time_ms,a.emg_rms,a.emg_mav,a.confidence) for a in batch.attempts])
+        insert_attempts(c,sid,batch.attempts)
         c.commit(); return {"session_id":sid,"uploaded":len(batch.attempts)}
 
 @app.patch("/sessions/{sid}")
@@ -111,7 +119,7 @@ def attempts(sid:int):
 
 @app.get("/patients/{pid}/export.csv")
 def export(pid:str):
-    with closing(connect()) as c: rows=c.execute("SELECT s.session_id,s.started_at,s.game_name,s.total_score,s.duration_s,s.accuracy,a.ts,a.target_movement,a.detected_movement,a.vision_label,a.correct,a.reaction_time_ms,a.emg_rms,a.emg_mav,a.confidence FROM sessions s LEFT JOIN attempts a USING(session_id) WHERE s.patient_id=? ORDER BY s.started_at",(pid,)).fetchall()
+    with closing(connect()) as c: rows=c.execute("SELECT s.session_id,s.started_at,s.game_name,s.total_score,s.duration_s,s.accuracy,a.ts,a.target_movement,a.detected_movement,a.vision_label,a.correct,a.reaction_time_ms,a.emg_rms,a.emg_mav,a.confidence,a.input_source,a.emg_activity_pct,a.effort_required_pct,a.effort_ok FROM sessions s LEFT JOIN attempts a USING(session_id) WHERE s.patient_id=? ORDER BY s.started_at",(pid,)).fetchall()
     if not rows: raise HTTPException(404,"No sessions found")
     buff=io.StringIO(); writer=csv.DictWriter(buff,fieldnames=rows[0].keys()); writer.writeheader(); writer.writerows(map(dict,rows)); buff.seek(0)
     return StreamingResponse(iter([buff.getvalue()]),media_type="text/csv",headers={"Content-Disposition":f"attachment; filename={pid}_sessions.csv"})

@@ -38,7 +38,7 @@ The built web app is also served at `/ui` when `webapp/dist` exists.
 | POST | `/sessions/sync-pending` | none | Imports `data/logs/pending_sessions.jsonl`; `{"imported","failed"}` |
 | GET | `/games` | none | Game catalogue (id, name, modes, description, what it trains) and input modes |
 | GET | `/games/status` | none | `{"running","pid","last"}` |
-| POST | `/games/launch` | `{"game","mode","patient_id","difficulty","duration_s"}` | Starts `main.py`; 400 on bad input, 409 if a game runs |
+| POST | `/games/launch` | `{"game","mode","patient_id","difficulty","duration_s","effort"}`; `effort` is `auto` or 0-100, used in `live` and `replay` modes | Starts `main.py`; 400 on bad input, 409 if a game runs |
 | POST | `/games/stop` | none | Terminates the running game (kills it after 5 s) |
 | GET | `/games/log` | `lines` (1-1000, default 80) | Last lines of `data/logs/dashboard_game.log` |
 | GET | `/datasets` | none | CSV files under `Dataset/` and `data/raw/emg/` with rows, columns, size, category (normal, patient, recorded) |
@@ -53,7 +53,7 @@ For `Dataset/` files (one signal column plus `movement_label`), features and com
 ## Models
 
 - **Patient:** `patient_id` (regex `^P[A-Za-z0-9_-]{1,20}$`), `age` 0-120, `affected_side`, `stroke_date`, `notes` (all optional except the ID).
-- **Attempt:** `target_movement`, `detected_movement`, `correct`, `reaction_time_ms` (>= 0); optional `ts`, `vision_label`, `emg_rms`, `emg_mav`, `confidence`.
+- **Attempt:** `target_movement`, `detected_movement`, `correct`, `reaction_time_ms` (>= 0); optional `ts`, `vision_label`, `emg_rms`, `emg_mav`, `confidence`, `input_source` (for example `Camera + EMG sensor`), `emg_activity_pct` (effort 0-100), `effort_required_pct` and `effort_ok` (grip actions in Webcam + EMG mode only; otherwise null). The four optional input fields are stored, returned by `/sessions/{sid}/attempts` and included in the CSV export.
 - **Session:** `patient_id`, `game_name`, `total_score`, `duration_s` (>= 0), `attempts`.
 - **Launch:** `game` (balloon, car, treasure, shape), `mode` (vision, live, replay, keyboard, sim; replay runs live mode with `--emg-source replay`), `patient_id`, `difficulty` (auto, easy, medium, hard), `duration_s` (0-3600, default 180).
 

@@ -171,7 +171,7 @@ class ShapeMatching(BaseGame):
         sparkles = []
         matched = set()
         active_shape = None
-        was_grabbing = False
+        was_grabbing = False; pick_effort = None
         round_done_at = None
         hand = [self.W / 2, self.H / 2]
         self.prompt = "Pick up a shape"
@@ -224,9 +224,12 @@ class ShapeMatching(BaseGame):
                 if math.dist((px, py), positions[nearest]) <= grab_radius:
                     hovered = nearest
 
-            # Vision controls pointer and grasp; EMG remains an activity measurement.
-            if round_done_at is None and grabbing and not was_grabbing and active_shape is None and hovered:
-                active_shape = hovered
+            # Vision controls pointer and grasp; in Webcam + EMG mode picking up also needs the required grip effort.
+            grip = self.grip(grabbing, ready=round_done_at is None and active_shape is None and hovered is not None, pos=(px, py))
+            if grip == "weak":
+                self.log_weak_grip()
+            if grip == "fire":
+                active_shape = hovered; pick_effort = self.emg_activity()
                 self.target_set(hovered)
                 self.sound("tick")
 
@@ -244,7 +247,7 @@ class ShapeMatching(BaseGame):
                 if over_hole == shape:
                     matched.add(shape)
                     snapping[shape] = now
-                    self.log(shape)
+                    self.log(shape, pos=targets[shape], title=f"{shape} placed", card=True, effort=pick_effort, grip=True)
                     tx, ty = targets[shape]
                     for _ in range(16):
                         a = random.uniform(0, math.tau); v = random.uniform(1.5, 4.5)
@@ -258,7 +261,7 @@ class ShapeMatching(BaseGame):
                     else:
                         self.target_set("Pick up a shape")
                 elif over_hole is not None:
-                    self.log(f"Wrong hole ({over_hole})")
+                    self.log(f"Wrong hole ({over_hole})", pos=targets[over_hole], title=f"Wrong hole: {over_hole.lower()}", card=True, effort=pick_effort, grip=True)
                     shake[over_hole] = now
                     self.popup(f"That hole is for the {over_hole.lower()}", (255, 170, 150), 30)
                     returning[shape] = (now, tuple(positions[shape]))
@@ -380,15 +383,11 @@ class ShapeMatching(BaseGame):
 
             self.hud()
             lines = [f"Round {round_no}   Placed {len(matched)} of {len(names)}"]
-            if hardware_controls and emg_features:
-                lines.append((f"EMG RMS {self.emg_rms:.1f} | MAV {self.emg_mav:.1f}", (40, 90, 60)))
-            elif getattr(self, "control_mode", "keyboard") == "live":
-                lines.append(("EMG activity unavailable; camera control remains active.", (200, 120, 20)))
             if camera_mode and hand_pointer is None:
                 lines.append(("Show your hand to the camera (the mouse also works)", (200, 120, 20)))
             self.info(lines, (40, 52, 70), shadow=False)
 
-            pygame.display.flip()
+            self.present()
             clock.tick(30)
             if pygame.key.get_pressed()[pygame.K_ESCAPE]:
                 self.running = False

@@ -180,7 +180,7 @@ class TreasureHunt(BaseGame):
             if cmd in STEPS:
                 self.popup("Stay on the chest: open your hand", (255, 214, 92), 28)
                 return
-            if self.log(cmd):
+            if self.log(cmd, pos=self.cell_center(self.player), title="Chest unlocked" if cmd == self.target else None, card=True):
                 self.chests[self.player] = "open"
                 self.phase = "grab"
                 self.target_set("Hand_Close")
@@ -192,7 +192,7 @@ class TreasureHunt(BaseGame):
             if cmd in STEPS:
                 self.popup("Make a fist to grab the gold first", (255, 214, 92), 28)
                 return
-            if self.log(cmd):
+            if self.log(cmd, pos=self.cell_center(self.player), title="Gold grabbed" if cmd == self.target else None, card=True, grip=True):
                 self.chests[self.player] = "collected"
                 self.score += 25
                 self.sound("chest")
@@ -462,8 +462,14 @@ class TreasureHunt(BaseGame):
                 gesture = "Hand_Close" if fist else ("Hand_Open" if visual and visual[0] == "Hand_Open" else None)
                 if self.phase != "explore":
                     self.joystick(pointer)
+                self.cmd = step or gesture or "Rest"
+                # Grabbing the gold needs a grip at the required effort (Webcam + EMG mode).
+                grip = self.grip(gesture == "Hand_Close", ready=self.phase == "grab", pos=self.cell_center(self.player))
+                if grip == "weak" and self.phase == "grab":
+                    self.log_weak_grip(); self.target_set("Hand_Close")
+                if gesture == "Hand_Close" and self.phase == "grab" and grip != "fire":
+                    gesture = None
                 cmd = step or (gesture if self.phase in ("unlock", "grab") else None)
-                self.cmd = cmd or (gesture or "Rest")
             else:
                 cmd = self.cmd if self.cmd not in ("Rest", "No_Hand", None) else None
             if self.phase == "cleared":
@@ -510,12 +516,6 @@ class TreasureHunt(BaseGame):
             self.draw_pad(now, frame, camera)
 
             self.hud()
-            lines = []
-            if emg_features:
-                lines.append((f"EMG activity: RMS {self.emg_rms:.1f} | MAV {self.emg_mav:.1f}", (210, 245, 225)))
-            elif getattr(self, "control_mode", "keyboard") == "live":
-                lines.append(("EMG activity sensor unavailable", (255, 210, 130)))
-            self.info(lines)
-            pygame.display.flip()
+            self.present()
             clock.tick(30)
         self.save_session()

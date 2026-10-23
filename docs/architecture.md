@@ -1,6 +1,6 @@
 # System architecture
 
-The camera decides every game movement, the EMG sensor adds a muscle-activity measurement to each command, and every session is stored by a local API that a web app (RehabHub) reads. Everything runs on one PC.
+The camera decides every game movement, the EMG sensor adds a muscle-activity measurement to each command (and in Webcam + EMG mode holds back grip actions below the patient's effort threshold), and every session is stored by a local API that a web app (RehabHub) reads. Everything runs on one PC.
 
 This document describes the system as implemented on 2026-10-18 (branch `main`). It replaces the architecture in `Stroke_Rehab_System_Documentation.pdf` and the root `architecture.md`; see [corrections.md](corrections.md) for what those got wrong.
 
@@ -228,7 +228,7 @@ FYP/
 ├── data/                     models/ (MediaPipe), raw/, features/, logs/
 ├── models/moment/            committed fine-tuning runs (LoRA adapters, metrics, logs)
 ├── results/                  tables/, figures/, splits.json
-├── tests/                    47 pytest tests
+├── tests/                    57 pytest tests
 └── docs/                     this documentation
 ```
 
