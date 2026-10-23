@@ -47,6 +47,8 @@ Edit `config/settings.yaml`, or use the web app's Settings page.
 | `game_session_seconds` | 180 | Different session length; 0 = no limit |
 | `game_difficulty` | `auto` | Fixed `easy`, `medium` or `hard` |
 | `game_sound` / `game_show_screens` | true / true | Mute sound, or skip start and results screens |
+| `game_levels` | true | `false` skips the level panel and always plays free play |
+| `level_days_between` | 1 | Days after passing a level before the next opens: 1 = a new level a day, 7 = one a week, 0 = straight away |
 | `game_effort_required` | `auto` | Grip effort needed in Webcam + EMG mode: `auto` follows the difficulty (25-60%), or a fixed 0-100 (% of the patient's strongest squeeze); 0 = off |
 | `game_emg_calibration` | true | `false` skips the muscle check and reuses the patient's saved one |
 
@@ -56,7 +58,7 @@ Edit `config/settings.yaml`, or use the web app's Settings page.
 2. Start the API: `python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000`.
    If port 8000 is already used (on the development Mac a Docker container uses it), run `--port 8001` and set `backend_url: "http://127.0.0.1:8001"` so games save to it.
 3. Open the web app at `http://127.0.0.1:8000/ui` (or `:8001/ui`).
-4. Add a patient (Patients, coded ID such as `P01`), then use **Game Launcher** to choose patient, game, input mode, difficulty and length, and start. The game window opens on this computer.
+4. Add a patient (Patients, coded ID such as `P01`), then use **Game Launcher** to choose patient, game, input mode, level and length, and start. The game window opens on this computer. *Level* shows the patient's progress in that game (passed levels have a tick, levels not yet open are greyed out with the date they open); leave it on *Choose in game* to let the patient pick on the level panel.
 
 For web app development use `cd webapp && npm run dev` and `http://localhost:5173`; this mode needs the API on port 8000.
 
@@ -72,9 +74,11 @@ The older Streamlit dashboard still works: `streamlit run dashboard/dashboard.py
 | Webcam + EMG sensor | `python main.py live --game shape` | Webcam, ESP32 + MD0437 |
 | Webcam + EMG replay | `python main.py live --emg-source replay --game car` | Webcam; EMG comes from a recorded volunteer in `Dataset/` (`EMG_REPLAY_SUBJECT=S05` picks another) |
 
-Options: `--patient P02`, `--difficulty auto|easy|medium|hard`, `--duration 120` (seconds, 0 = no limit), `--effort auto|0-100` (Webcam + EMG: grip effort needed). Games are `balloon`, `car`, `treasure` and `shape`.
+Options: `--patient P02`, `--level choose|free|1-7` (default `choose`: the level panel), `--difficulty auto|easy|medium|hard` (free play), `--duration 120` (seconds, 0 = no limit), `--effort auto|0-100` (Webcam + EMG: grip effort needed). Games are `balloon`, `car`, `treasure` and `shape`.
 
 **Webcam + EMG sessions start with a muscle check:** relax the hand for 3 s, then squeeze as hard as is comfortable for 3 s. From then on a pop, brake, gold grab or shape pick-up only counts when the grip reaches the effort needed (a share of that squeeze); a weaker fist shows "Squeeze harder". Press S during the check to reuse the patient's last one. Details: [games.md](games.md#grip-effort-threshold).
+
+**Levels:** every game starts with a panel of seven levels plus free play. Each level has a goal (for example "Pop 10 balloons"); reaching it before time runs out passes the level, and the next level opens the following day. Choose with the hand (move over a card and hold it open) or with arrows/number keys and Enter. Details: [games.md](games.md#levels-1-to-7).
 
 **In every game:** Enter pauses, M mutes, Esc ends and saves the session.
 
@@ -93,6 +97,7 @@ Each session ends with a results screen (score, accuracy, best streak, reaction 
 | Symptom | Fix |
 |---|---|
 | "Could not open a webcam" | Grant camera permission to the terminal/IDE (macOS: System Settings > Privacy & Security > Camera); close other camera apps; try another `camera_index` |
+| A level is greyed out | The previous level has not been passed yet, or it was passed today and the next opens tomorrow. Set `level_days_between: 0` to open levels straight away (for example for a demonstration) |
 | Balloons never pop in Webcam + EMG mode | The grip is below the effort needed (the strip shows "x% / need y%"): redo the muscle check with a real squeeze, check the electrodes, or lower *Grip effort needed* (or `--effort`) |
 | Game stuck on "Waiting for valid EMG sensor data" | Check `serial_port` and baud rate, close Arduino Serial Monitor, check the ESP32 is printing lines |
 | Web app shows errors or no data | Check the API is running and on the port the page uses; in dev mode the API must be on 8000 |

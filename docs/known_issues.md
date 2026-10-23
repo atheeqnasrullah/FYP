@@ -16,6 +16,7 @@ Checked against the code and data on 2026-10-18 (branch `main`). Issues are thin
 | 8 | `npm run lint` reports 4 `react-refresh/only-export-components` warnings | Only affects hot reload in development | Move shared helpers out of component files |
 | 9 | The patient file changed from the generated `SYN_STROKE_01` to `SP01` on 2026-10-18; its origin (real or generated) is not documented | Patient results (now computed on `SP01`) cannot be called clinical | Confirm and document `SP01`'s origin |
 | 10 | The grip effort threshold (auto 25-60% of the strongest squeeze) is a starting guess; it has not been tried with patients | The default may be too hard or too easy for some patients | Check it in the usability study; the therapist can set a fixed value or turn it off per session |
+| 11 | The level goals (for example 6 to 18 balloons) and the one-level-a-day pace are first choices, not tested with patients | Some levels may be too easy or too hard to pass in 3 minutes | Tune `GOALS` in `src/games/levels.py` after the usability study; the therapist can change `level_days_between` and the session length |
 
 ## Fixed (2026-10-18 to 2026-10-21)
 

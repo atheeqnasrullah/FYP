@@ -6,6 +6,7 @@ from src.utils.session_sync import PENDING, upload_session, sync_pending_session
 from src.realtime.pipeline import latest, lock, status_bus, emg_is_ready
 from src.games.audio import SoundBoard
 from src.games.difficulty import Difficulty
+from src.games.levels import LEVEL_COUNT, NAMES, default_level, difficulty_level, goal, goal_text, level_status, opens_text, playable, record_result
 from src.games.effort import calibrate, effort_pct, load_calibration, parse_required, required_effort, save_calibration
 from src.games.summary import encouragement, friendly, stars, summarize
 
@@ -86,18 +87,33 @@ class BaseGame:
         self.effort_setting=parse_required(cfg.get("game_effort_required","auto"))
         self.calibrate_each_session=bool(cfg.get("game_emg_calibration",True))
         self.calibration=None; self._grip=self._new_grip()
+        # Levels 1-7 (src/games/levels.py): "choose" shows the level panel, "free" is free play, or a level number.
+        self.levels_enabled=bool(cfg.get("game_levels",True)); self.level_days=max(0,int(cfg.get("level_days_between",1) or 0))
+        self.level_request="choose"; self.level=None; self.level_goal=0; self.level_unit=""; self.goal_reached_at=None; self.level_result=None
 
     # ------------------------------------------------------------ session flow
     def begin(self):
         """Start screen and countdown, then reset the clock so only play time counts."""
         self.difficulty=Difficulty(self.difficulty_mode,self.patient,self.name)
         self.sfx=SoundBoard(self.sound_enabled)
+        choice=self.level_request
+        if choice=="choose": choice=self.level_select_screen() if self.show_screens and self.levels_enabled else "free"
+        if not self.running: return False
+        self.set_level(choice)
         if self.show_screens: self.intro_screen()
         if self.running: self.setup_effort()
         if self.show_screens and self.running: self.countdown()
         self.started=time.monotonic()
         if self.target is not None: self.target_t=self.started
         return self.running
+    def set_level(self,choice):
+        """Play level 1-7 (fixed difficulty and a goal) or, for "free", free play at the chosen difficulty."""
+        if not isinstance(choice,int): return
+        self.level=choice; self.level_goal,self.level_unit=goal(self.name,choice)
+        self.difficulty=Difficulty(patient=self.patient,game=self.name,level=difficulty_level(choice))
+    def level_count(self):
+        """Progress toward the level goal; games with another goal (stars, chests) override this."""
+        return sum(1 for a in self.attempts if a.get("correct"))
     def remaining(self):
         if self.session_seconds<=0: return None
         return max(0.0,self.session_seconds-(time.monotonic()-self.started))
@@ -128,6 +144,12 @@ class BaseGame:
             self._last_tick_second=second
             if left<=0 and self.running:
                 self.time_up=True; self.running=False
+        # A level ends shortly after its goal is reached, so the last success can still be seen.
+        if self.level and self.running:
+            if self.goal_reached_at is None and self.level_count()>=self.level_goal:
+                self.goal_reached_at=time.monotonic(); self.popup(f"Level {self.level} complete!",GOOD,size=52); self.sound("level_up")
+            elif self.goal_reached_at is not None and time.monotonic()-self.goal_reached_at>=1.6:
+                self.running=False
     def pause(self):
         """Freeze the game until Enter is pressed again; paused time is not counted."""
         snapshot=self.screen.copy(); paused_at=time.monotonic(); clock=pygame.time.Clock(); waiting=True
@@ -430,8 +452,8 @@ class BaseGame:
         if left is not None:
             minutes,seconds=divmod(int(math.ceil(left)),60)
             self.text(f"{minutes}:{seconds:02d}",(self.W-16-self.get_font(40).size(f"{minutes}:{seconds:02d}")[0],5),BAD if left<=10 else INK,40)
-        level=self.difficulty.label()
-        self.text(level,(self.W-16-self.get_font(22).size(level)[0],38),MUTED,22)
+        level=self.difficulty.label() if not self.level else f"Level {self.level}: {min(self.level_count(),self.level_goal)} of {self.level_goal} {self.level_unit}"
+        self.text(level,(self.W-16-self.get_font(22).size(level)[0],38),GOOD if self.goal_reached_at else MUTED,22)
         if self.runtime_message:
             message=str(self.runtime_message)
             if len(message)>95: message=message[:92]+"..."
@@ -545,7 +567,7 @@ class BaseGame:
     def instructions(self):
         return list(self.how_to_play)
     def intro_screen(self):
-        clock=pygame.time.Clock(); opened_since=None; shown=time.monotonic(); auto_start=25
+        clock=pygame.time.Clock(); opened_since=None; shown=time.monotonic(); auto_start=25; armed=False
         camera=getattr(self,"control_mode","keyboard") in ("vision","live")
         while self.running:
             start=False
@@ -557,18 +579,20 @@ class BaseGame:
                 self.check_camera()
                 if not self.running: break
                 with lock: visual=latest.get("vis")
-                if visual and visual[0]=="Hand_Open":
+                # The hand must leave the open pose once first, so the hold that picked a level does not also start.
+                if visual and visual[0]=="Hand_Open" and armed:
                     opened_since=opened_since or time.monotonic(); hold=time.monotonic()-opened_since
                     if hold>=1.2: start=True
-                else: opened_since=None
+                else: opened_since=None; armed=armed or not (visual and visual[0]=="Hand_Open")
             waited=time.monotonic()-shown
             if start or waited>=auto_start: break
             self.draw_camera_background((18,30,52),overlay_alpha=190)
             card=pygame.Rect(90,50,self.W-180,self.H-100)
             self.panel(card,215)
             self.text(self.name.replace("_"," "),(self.W//2,card.y+44),GOLD,58,center=True)
-            self.text(f"Patient {self.patient}   |   {self.difficulty.label()}   |   "+(f"{int(self.session_seconds//60)}:{int(self.session_seconds%60):02d} min session" if self.session_seconds>0 else "No time limit"),(self.W//2,card.y+88),MUTED,26,center=True)
-            self.text("How to play",(card.x+40,card.y+122),INK,32)
+            self.text(f"Patient {self.patient}   |   {f'Level {self.level}: {NAMES[self.level-1]}' if self.level else 'Free play, '+self.difficulty.label()}   |   "+(f"{int(self.session_seconds//60)}:{int(self.session_seconds%60):02d} min session" if self.session_seconds>0 else "No time limit"),(self.W//2,card.y+88),MUTED,26,center=True)
+            if self.level: self.text(f"Goal: {goal_text(self.name,self.level)}",(card.x+40,card.y+122),GOLD,32)
+            else: self.text("How to play",(card.x+40,card.y+122),INK,32)
             y=card.y+160
             for i,line in enumerate(self.instructions(),1):
                 self.text(f"{i}.  {line}",(card.x+44,y),INK,27); y+=34
@@ -606,7 +630,13 @@ class BaseGame:
         if self.aborted:
             print("Session not saved: the webcam could not be opened.",flush=True)
             pygame.quit(); return
-        payload={"patient_id":self.patient,"game_name":self.name,"total_score":self.score,"duration_s":int(time.monotonic()-self.started),"attempts":self.attempts}
+        if self.level:
+            count=self.level_count(); passed=count>=self.level_goal
+            self.level_result={"count":count,"passed":passed,"stars":stars(summarize(self.attempts)) if passed else 0}
+            try: record_result(self.patient,self.name,self.level,count,passed,self.level_result["stars"])
+            except OSError as exc: print(f"Level progress not saved: {exc}",flush=True)
+        payload={"patient_id":self.patient,"game_name":self.name,"total_score":self.score,"duration_s":int(time.monotonic()-self.started),"attempts":self.attempts,
+                 "level":self.level,"level_passed":None if not self.level else self.level_result["passed"]}
         cfg=load_settings()
         self.save_latency_log()
         self.difficulty.save()
@@ -630,6 +660,9 @@ class BaseGame:
         summary=summarize(self.attempts); count=stars(summary); clock=pygame.time.Clock()
         shown=time.monotonic(); close_after=45; self.sound("finish")
         title="Time's up!" if self.time_up else "Session complete"
+        message=encouragement(summary)
+        if self.level:
+            title,message=self.level_message()
         new_best=best is not None and self.score>best
         while True:
             done=False
@@ -642,12 +675,12 @@ class BaseGame:
             self.text(title,(self.W//2,card.y+40),GOLD,56,center=True)
             for i in range(3):
                 self.star((self.W//2-70+i*70,card.y+100),26,i<count)
-            self.text(encouragement(summary),(self.W//2,card.y+142),INK,28,center=True)
+            self.text(message,(self.W//2,card.y+142),GOOD if self.level and self.level_result["passed"] else INK,28,center=True)
             minutes,seconds=divmod(payload["duration_s"],60)
             stats=[("Score",str(self.score)+("  New best!" if new_best else "")),("Accuracy",f"{summary['accuracy']*100:.0f}%" if summary["attempts"] else "-"),
                    ("Good movements",f"{summary['correct']} of {summary['attempts']}"),("Best streak",str(summary["best_streak"])),
                    ("Avg reaction",f"{summary['avg_reaction_ms']/1000:.1f} s" if summary["avg_reaction_ms"] else "-"),("Time played",f"{minutes}:{seconds:02d}"),
-                   ("Level",f"{self.difficulty.start_level:.1f} -> {self.difficulty.level:.1f}" if self.difficulty.mode=="auto" else self.difficulty.label())]
+                   ("Level",f"{self.level}: {NAMES[self.level-1]}" if self.level else f"{self.difficulty.start_level:.1f} -> {self.difficulty.level:.1f}" if self.difficulty.mode=="auto" else self.difficulty.label())]
             if best is not None and not new_best: stats.append(("Previous best",str(best)))
             effort=[a["emg_activity_pct"] for a in self.attempts if a.get("correct") and a.get("emg_activity_pct") is not None]
             if effort: stats.append(("Avg muscle activity",f"{sum(effort)/len(effort):.0f}% ({activity_level(sum(effort)/len(effort))})"))
@@ -668,6 +701,121 @@ class BaseGame:
             self.text(saved,(self.W//2,card.bottom-62),GOOD if saved.startswith("Saved to") else GOLD,24,center=True)
             self.text(f"Press Space to close   |   closes in {int(close_after-waited)} s",(self.W//2,card.bottom-30),MUTED,22,center=True)
             pygame.display.flip(); clock.tick(30)
+    def level_message(self):
+        """Results title and line for a level: passed or not, and when the next level opens."""
+        n=self.level; r=self.level_result
+        if not r["passed"]:
+            again=f" to open level {n+1}" if n<LEVEL_COUNT else ""
+            return (f"Level {n}: {r['count']} of {self.level_goal}",f"{r['count']} of {self.level_goal} {self.level_unit}. Try level {n} again{again}!")
+        if n==LEVEL_COUNT: return (f"Level {n} complete!",f"All {LEVEL_COUNT} levels done. Amazing work!")
+        nxt=level_status(self.patient,self.name,days_between=self.level_days)[n]
+        if nxt["state"]=="waiting": return (f"Level {n} complete!",f"Level {n+1} opens {opens_text(nxt['opens_on'])}. See you then!")
+        return (f"Level {n} complete!",f"Level {n+1} is open: play it next!")
+
+    # ------------------------------------------------------------ level panel
+    def level_select_screen(self):
+        """Panel of the seven levels plus free play. Returns a level number, "free", or None if cancelled.
+
+        Arrows, number keys or the mouse pick a card and Enter/Space or a click starts it; with the camera,
+        move the hand over a card and hold it open. Locked cards say what opens them."""
+        rows=level_status(self.patient,self.name,days_between=self.level_days)
+        options=[*rows,{"level":"free","name":"Free play","state":"free"}]
+        sel=default_level(rows)-1
+        clock=pygame.time.Clock(); shown=time.monotonic(); auto_pick=45; hold_since=None; note=None; armed=False
+        camera=getattr(self,"control_mode","keyboard") in ("vision","live")
+        cw,ch,gap=190,150,16; x0=(self.W-(4*cw+3*gap))//2; y0=150
+        rects=[pygame.Rect(x0+(i%4)*(cw+gap),y0+(i//4)*(ch+gap),cw,ch) for i in range(len(options))]
+        def choose(i):
+            nonlocal note
+            row=options[i]
+            if row["state"]=="free": return "free"
+            if playable(row): return row["level"]
+            note=(f"Level {row['level']} opens {opens_text(row['opens_on'])}" if row["state"]=="waiting"
+                  else f"Pass level {row['level']-1} first to open level {row['level']}",time.monotonic())
+            self.sound("miss"); return None
+        while self.running:
+            picked=None
+            for e in pygame.event.get():
+                if e.type==pygame.QUIT or (e.type==pygame.KEYDOWN and e.key==pygame.K_ESCAPE): self.running=False
+                elif e.type==pygame.KEYDOWN:
+                    if e.key==pygame.K_LEFT: sel=(sel-1)%len(options)
+                    elif e.key==pygame.K_RIGHT: sel=(sel+1)%len(options)
+                    elif e.key in (pygame.K_UP,pygame.K_DOWN): sel=(sel+4)%len(options)
+                    elif pygame.K_1<=e.key<=pygame.K_7: sel=e.key-pygame.K_1
+                    elif e.key==pygame.K_f: sel=len(options)-1
+                    elif e.key in (pygame.K_SPACE,*PAUSE_KEYS): picked=choose(sel)
+                elif e.type==pygame.MOUSEMOTION or e.type==pygame.MOUSEBUTTONDOWN:
+                    hit=next((i for i,r in enumerate(rects) if r.collidepoint(e.pos)),None)
+                    if hit is not None:
+                        sel=hit
+                        if e.type==pygame.MOUSEBUTTONDOWN: picked=choose(hit)
+            hold=0.0
+            if camera:
+                self.check_camera()
+                if not self.running: break
+                with lock: pointer=latest.get("pointer"); visual=latest.get("vis")
+                if pointer is not None:
+                    hit=next((i for i,r in enumerate(rects) if r.collidepoint(int(pointer[0]*self.W),int(pointer[1]*self.H))),None)
+                    if hit is not None and hit!=sel: sel=hit; hold_since=None
+                if visual and visual[0]=="Hand_Open" and armed:
+                    hold_since=hold_since or time.monotonic(); hold=time.monotonic()-hold_since
+                    if hold>=1.5: picked=choose(sel); hold_since=None; armed=False
+                else: hold_since=None; armed=armed or not (visual and visual[0]=="Hand_Open")
+            waited=time.monotonic()-shown
+            if picked is None and waited>=auto_pick: picked=default_level(rows)
+            if picked is not None: self.sound("tick"); return picked
+            self.draw_level_panel(options,rects,sel,hold/1.5,note,int(auto_pick-waited),camera)
+            pygame.display.flip(); clock.tick(30)
+        return None
+    def draw_level_panel(self,options,rects,sel,hold,note,auto_left,camera):
+        self.draw_camera_background((18,30,52),overlay_alpha=200)
+        self.panel((20,16,self.W-40,self.H-32),215)
+        rows=options[:-1]; done=sum(r["state"]=="passed" for r in rows)
+        self.text(f"{self.name.replace('_',' ')}: choose a level",(self.W//2,52),GOLD,48,center=True)
+        pace=("Pass a level to open the next one" if self.level_days==0 else "Pass a level and the next one opens tomorrow" if self.level_days==1
+              else f"Pass a level and the next one opens {self.level_days} days later")
+        self.text(f"Patient {self.patient}   |   {done} of {LEVEL_COUNT} levels done   |   {pace}",(self.W//2,96),MUTED,23,center=True)
+        for i,(row,rect) in enumerate(zip(options,rects)):
+            state=row["state"]; open_=state in ("passed","open","free")
+            self.panel(rect,235 if open_ else 150,(30,44,70) if open_ else (22,28,40),radius=14)
+            accent={"passed":GOOD,"open":GOLD,"free":(140,190,255)}.get(state,(110,118,136))
+            if i==sel: pygame.draw.rect(self.screen,GOLD,rect.inflate(6,6),4,border_radius=16)
+            ink=INK if open_ else (128,136,152)
+            if state=="free":
+                self.text("Free",(rect.x+16,rect.y+12),accent,52)
+                self.text("Free play",(rect.x+16,rect.y+66),ink,27)
+                self.text("No goal",(rect.x+16,rect.y+96),MUTED,20)
+                self.text(self.difficulty.label(),(rect.x+16,rect.y+120),MUTED,20)
+            else:
+                self.text(str(row["level"]),(rect.x+16,rect.y+6),accent,64)
+                badge={"passed":"Done","open":"Play","waiting":"Soon","locked":"Locked"}[state]
+                bw=self.get_font(21).size(badge)[0]+16
+                self.panel((rect.right-bw-10,rect.y+12,bw,24),255,accent if open_ else (60,66,80),radius=12)
+                self.text(badge,(rect.right-bw//2-10,rect.y+24),PANEL if open_ else MUTED,21,center=True,shadow=False)
+                if not open_: self.padlock((rect.right-30,rect.y+62))
+                self.text(row["name"],(rect.x+16,rect.y+66),ink,27)
+                self.text(row["goal"],(rect.x+16,rect.y+96),MUTED if open_ else (110,118,136),20)
+                if state=="passed":
+                    for k in range(3): self.star((rect.x+26+k*30,rect.y+130),11,k<row["stars"])
+                elif state=="waiting":
+                    self.text(f"Opens {opens_text(row['opens_on'])}",(rect.x+16,rect.y+120),GOLD,20)
+                elif state=="locked":
+                    self.text(f"Pass level {row['level']-1} first",(rect.x+16,rect.y+120),(110,118,136),20)
+                elif row.get("best"):
+                    self.text(f"Best so far: {row['best']}",(rect.x+16,rect.y+120),MUTED,20)
+            if i==sel and hold>0:
+                pygame.draw.rect(self.screen,GOOD,(rect.x+8,rect.bottom-10,int((rect.w-16)*min(1,hold)),6),border_radius=3)
+        y=rects[-1].bottom+26
+        if note and time.monotonic()-note[1]<2.5: self.text(note[0],(self.W//2,y),BAD,28,center=True)
+        elif camera: self.text("Move your hand over a level, then hold your hand open to start",(self.W//2,y),GOOD,27,center=True)
+        else: self.text("Arrows, 1-7 or the mouse to choose   |   Enter or click to start",(self.W//2,y),INK,26,center=True)
+        self.text(f"Starts level {default_level(options[:-1])} by itself in {max(0,auto_left)} s   |   Esc to cancel",(self.W//2,y+34),MUTED,22,center=True)
+    def padlock(self,center):
+        x,y=center; colour=(130,138,156)
+        pygame.draw.arc(self.screen,colour,(x-9,y-18,18,22),0,math.pi,3)
+        pygame.draw.rect(self.screen,colour,(x-12,y-7,24,18),border_radius=4)
+        pygame.draw.circle(self.screen,(22,28,40),(x,y+2),3)
+
     def star(self,center,radius,filled):
         cx,cy=center
         points=[(cx+math.cos(-math.pi/2+i*math.pi/5)*(radius if i%2==0 else radius*0.45),cy+math.sin(-math.pi/2+i*math.pi/5)*(radius if i%2==0 else radius*0.45)) for i in range(10)]

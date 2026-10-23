@@ -16,7 +16,7 @@ import yaml
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from src.utils.config import ROOT
+from src.utils.config import ROOT, load_settings
 
 router = APIRouter()
 
@@ -206,6 +206,7 @@ class Launch(BaseModel):
     patient_id: str
     difficulty: str = "auto"
     duration_s: int = Field(default=180, ge=0, le=3600)
+    level: str = "choose"  # choose (level panel in the game), free (free play) or 1-7
     effort: str = "auto"   # grip effort needed in Webcam + EMG modes: auto or 0-100 (% of the patient's strongest squeeze)
 
 
@@ -221,6 +222,16 @@ def _status():
 @router.get("/games")
 def games():
     return {"games": GAMES, "modes": MODES}
+
+
+@router.get("/games/levels/{patient_id}")
+def game_levels(patient_id: str):
+    """Level progress (1-7) of one patient in every game, with when locked levels open."""
+    from src.games.levels import GAME_IDS, level_status
+    if not PATIENT_RE.match(patient_id):
+        raise HTTPException(400, "Invalid patient code")
+    days = int((load_settings().get("level_days_between", 1)) or 0)
+    return {"days_between": days, "games": {gid: level_status(patient_id, name, days_between=days) for gid, name in GAME_IDS.items()}}
 
 
 @router.get("/games/status")
@@ -240,8 +251,10 @@ def launch(req: Launch):
     if req.difficulty not in DIFFICULTIES:
         raise HTTPException(400, "Difficulty must be auto, easy, medium or hard")
     from src.games.effort import parse_required
+    from src.games.levels import parse_level
     try:
         effort = parse_required(req.effort)
+        level = parse_level(req.level)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     if _status()["running"]:
@@ -254,6 +267,7 @@ def launch(req: Launch):
                "--patient", req.patient_id.strip(), "--difficulty", req.difficulty, "--duration", str(req.duration_s)]
     if req.mode == "replay":
         command += ["--emg-source", "replay"]
+    command += ["--level", str(level)]
     if req.mode in ("live", "replay"):
         command += ["--effort", "auto" if effort == "auto" else f"{effort:g}"]
     options = {"cwd": str(ROOT), "stdin": subprocess.DEVNULL}
@@ -270,7 +284,7 @@ def launch(req: Launch):
         raise HTTPException(500, f"Could not start the game: {exc}")
     _running["proc"] = proc
     _running["info"] = {"game": req.game, "game_name": game["name"], "mode": req.mode, "patient_id": req.patient_id.strip(),
-                        "difficulty": req.difficulty, "duration_s": req.duration_s, "effort": req.effort, "started_at": datetime.now(timezone.utc).isoformat(), "exit_code": None}
+                        "difficulty": req.difficulty, "duration_s": req.duration_s, "effort": req.effort, "level": str(level), "started_at": datetime.now(timezone.utc).isoformat(), "exit_code": None}
     return _status()
 
 

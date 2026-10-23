@@ -1,7 +1,6 @@
 import type {
   Attempt, CameraCheck, DatasetCompare, DatasetFeatures, DatasetFile, DatasetSignal, EmgReport, GameStatus, GamesInfo,
-  HardwarePorts, Overview, Patient, PatientSummary, Progress, Session, SettingsResponse,
-} from './types'
+  HardwarePorts, LevelProgress, Overview, Patient, PatientSummary, Progress, Session, SettingsResponse } from './types'
 
 const STORAGE_KEY = 'rehabhub.apiUrl'
 
@@ -86,8 +85,9 @@ export const api = {
 
   games: () => request<GamesInfo>('/games'),
   gameStatus: () => request<GameStatus>('/games/status'),
-  launchGame: (game: string, mode: string, patient_id: string, difficulty: string, duration_s: number, effort = 'auto') =>
-    request<GameStatus>('/games/launch', json('POST', { game, mode, patient_id, difficulty, duration_s, effort })),
+  launchGame: (game: string, mode: string, patient_id: string, difficulty: string, duration_s: number, effort = 'auto', level = 'choose') =>
+    request<GameStatus>('/games/launch', json('POST', { game, mode, patient_id, difficulty, duration_s, effort, level })),
+  gameLevels: (pid: string) => request<LevelProgress>(`/games/levels/${encodeURIComponent(pid)}`),
   stopGame: () => request<GameStatus & { message: string }>('/games/stop', json('POST')),
   gameLog: () => request<{ lines: string[] }>('/games/log'),
 

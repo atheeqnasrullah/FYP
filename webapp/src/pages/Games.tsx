@@ -30,6 +30,22 @@ const EFFORTS = [
   { value: '0', label: 'Off' },
 ]
 const EFFORT_MODES = ['live', 'replay']
+
+function levelPace(days: number) {
+  if (days === 0) return 'passing a level opens the next one straight away'
+  if (days === 1) return 'one new level opens each day after a pass'
+  return `a new level opens ${days} days after a pass`
+}
+
+function opensText(iso: string) {
+  const day = new Date(`${iso}T00:00:00`)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const diff = Math.round((day.getTime() - today.getTime()) / 86400000)
+  if (diff <= 0) return 'today'
+  if (diff === 1) return 'tomorrow'
+  return day.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+}
 const MODE_HELP: Record<string, string> = {
   vision: 'The webcam follows the hand; its picture appears behind the game.',
   live: 'Webcam controls the game; the EMG sensor adds muscle-activity readings. The game waits for sensor data.',
@@ -55,6 +71,7 @@ export default function Games() {
   const [difficulty, setDifficulty] = useState('auto')
   const [duration, setDuration] = useState(180)
   const [effort, setEffort] = useState('auto')
+  const [level, setLevel] = useState('choose')
   const [patient, setPatient] = useState(params.get('patient') ?? '')
   const [busy, setBusy] = useState(false)
   const [now, setNow] = useState(Date.now())
@@ -82,11 +99,18 @@ export default function Games() {
   const last = status.data?.last
   const validPatient = PATIENT_RE.test(patient)
   const known = patients.data?.find((p) => p.patient_id === patient)
+  const levels = useAsync(() => (validPatient ? api.gameLevels(patient) : Promise.resolve(null)), [patient, validPatient, running])
+  const levelRows = levels.data?.games[game] ?? []
+  const levelsDone = levelRows.filter((r) => r.state === 'passed').length
+  const nextLevel = levelRows.find((r) => r.state !== 'passed')
+  // A level picked for one patient or game may be locked for another.
+  useEffect(() => setLevel('choose'), [patient, game])
+  const levelLabel = level === 'choose' ? 'level chosen in game' : level === 'free' ? 'free play' : `level ${level}`
 
   const start = async () => {
     setBusy(true)
     try {
-      await api.launchGame(game, mode, patient, difficulty, duration, effort)
+      await api.launchGame(game, mode, patient, difficulty, duration, effort, level)
       toast(`${selected?.name} started: play in the game window on this computer`, 'good')
       status.reload()
     } catch (e) {
@@ -127,6 +151,7 @@ export default function Games() {
             <p className="muted">
               {info.data?.modes[last.mode]} · {DIFFICULTY[last.difficulty ?? 'auto']?.label ?? last.difficulty} ·{' '}
               {last.duration_s ? `${Math.round(last.duration_s / 60)} min session` : 'no time limit'}
+              {last.level && last.level !== 'choose' && ` · ${last.level === 'free' ? 'free play' : `level ${last.level}`}`}
               {EFFORT_MODES.includes(last.mode) && last.effort && ` · grip ${last.effort === 'auto' ? 'auto' : last.effort === '0' ? 'off' : `${last.effort}%`}`}
             </p>
             <p className="small muted">In the game window: Enter pauses, M mutes, Esc finishes early and saves.</p>
@@ -215,7 +240,41 @@ export default function Games() {
                 <small className="muted">{MODE_HELP[mode]}</small>
               </label>
               <label>
-                <span className="field-label">Difficulty</span>
+                <span className="field-label">Level</span>
+                <div className="segmented">
+                  <button type="button" className={level === 'choose' ? 'active' : ''} onClick={() => setLevel('choose')}>
+                    Choose in game
+                  </button>
+                  {levelRows.map((r) => (
+                    <button
+                      key={r.level}
+                      type="button"
+                      className={`${String(r.level) === level ? 'active' : ''} ${r.state === 'passed' ? 'passed' : ''}`}
+                      disabled={r.state === 'waiting' || r.state === 'locked'}
+                      title={`${r.name}: ${r.goal}${r.state === 'passed' ? ` · passed, ${r.stars} star${r.stars === 1 ? '' : 's'}` : r.state === 'waiting' && r.opens_on ? ` · opens ${opensText(r.opens_on)}` : r.state === 'locked' ? ' · pass the previous level first' : ''}`}
+                      onClick={() => setLevel(String(r.level))}
+                    >
+                      {r.state === 'passed' ? `${r.level} ✓` : r.level}
+                    </button>
+                  ))}
+                  <button type="button" className={level === 'free' ? 'active' : ''} onClick={() => setLevel('free')}>
+                    Free play
+                  </button>
+                </div>
+                <small className="muted">
+                  {!validPatient
+                    ? 'Choose a patient to see their levels.'
+                    : levels.data
+                      ? `${levelsDone} of 7 levels done in ${selected?.name ?? 'this game'}${
+                          nextLevel ? ` · next: level ${nextLevel.level} (${nextLevel.goal.toLowerCase()})${nextLevel.state === 'waiting' && nextLevel.opens_on ? `, opens ${opensText(nextLevel.opens_on)}` : ''}` : ''
+                        } · ${levelPace(levels.data.days_between)}.`
+                      : 'Loading levels…'}
+                  {level === 'choose' && ' The patient picks a level on the first screen of the game.'}
+                </small>
+              </label>
+              {(level === 'choose' || level === 'free') && (
+              <label>
+                <span className="field-label">{level === 'free' ? 'Difficulty' : 'Free-play difficulty'}</span>
                 <div className="segmented">
                   {Object.entries(DIFFICULTY).map(([d, v]) => (
                     <button key={d} type="button" className={d === difficulty ? 'active' : ''} onClick={() => setDifficulty(d)}>
@@ -223,8 +282,9 @@ export default function Games() {
                     </button>
                   ))}
                 </div>
-                <small className="muted">{DIFFICULTY[difficulty].help}</small>
+                <small className="muted">{DIFFICULTY[difficulty].help} Levels 1-7 set their own difficulty.</small>
               </label>
+              )}
               <label>
                 <span className="field-label">Session length</span>
                 <div className="segmented">
@@ -263,7 +323,7 @@ export default function Games() {
               <strong>{selected?.name}</strong>
               <span className="muted">
                 {' '}
-                for {validPatient ? patient : '—'} · {info.data.modes[mode]} · {DIFFICULTY[difficulty].label} · {DURATIONS.find((d) => d.value === duration)?.label}
+                for {validPatient ? patient : '—'} · {info.data.modes[mode]} · {levelLabel} · {DURATIONS.find((d) => d.value === duration)?.label}
               </span>
             </div>
             <button className="btn btn-primary btn-lg" onClick={start} disabled={busy || running || !validPatient}>

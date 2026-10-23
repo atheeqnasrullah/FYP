@@ -2,23 +2,23 @@
 
 ## Automated tests
 
-`python -m pytest -q` runs 57 tests in about 60 s, and all pass (2026-10-23, Python 3.11, main environment).
+`python -m pytest -q` runs 62 tests in about 70 s, and all pass (2026-10-23, Python 3.11, main environment).
 
 | Test file | Tests | Covers |
 |---|---|---|
 | `test_signal_processing.py` | 4 | Feature values, envelope vs raw filtering, windowing |
 | `test_fusion.py` | 3 | Confidence gate, majority smoothing, EMG features attached |
-| `test_backend.py` | 7 | Patient validation, session upload, progress, CSV export, open/attempt/close flow, errors, replay mode in the web launcher, grip effort stored and exported, bad effort rejected |
+| `test_backend.py` | 8 | Patient validation, session upload, progress, CSV export, open/attempt/close flow, errors, replay mode in the web launcher, grip effort stored and exported, bad effort rejected, level progress endpoint, level stored on sessions |
 | `test_session_sync.py` | 2 | Offline queue keeps only failed uploads |
 | `test_dashboard.py` | 1 | Streamlit dashboard runs without an API |
-| `test_game_logic.py` | 4 | Difficulty presets, auto level up and down, level remembered per patient, results summary |
-| `test_games_headless.py` | 20 | All four games with scripted input on a hidden display: scoring, time limit, hand-position lanes, hand joystick, pick and drop by hand, latency logging, input strip and action cards; grip threshold: a weak fist does not pop a balloon and is logged as `Weak_Grip`, a strong one pops, threshold 0 lets any fist pop, one firing per fist, calibration maths, saved calibration, replay calibration |
+| `test_game_logic.py` | 6 | Difficulty presets, auto level up and down, level remembered per patient, results summary, game levels open one a day (and with 0 or 7 days), per patient and per game, fixed difficulty per level |
+| `test_games_headless.py` | 22 | All four games with scripted input on a hidden display: scoring, time limit, hand-position lanes, hand joystick, pick and drop by hand, latency logging, input strip and action cards; grip threshold: a weak fist does not pop a balloon and is logged as `Weak_Grip`, a strong one pops, threshold 0 lets any fist pop, one firing per fist, calibration maths, saved calibration, replay calibration; a level ends when its goal is reached and opens the next level tomorrow; the level panel picks with keys and refuses locked levels |
 | `test_datasets_and_models.py` | 9 | `Dataset/` loading (both groups), labels match the games, stroke patient kept separate, segment splitting, 100 Hz feature windows, split gap, normalisation |
 | `test_emg_replay.py` | 1 | Replay of `Dataset/` feeds the live pipeline |
 | `test_prepare_finetune.py` | 3 | Fine-tuning preprocessing: 10 ms resampling, padding and masking, saved windows, S01 exclusion |
 | `test_public_emg.py` | 3 | Public-data envelope conversion, shared labels, safe archive extraction |
 
-The tests set `SDL_VIDEODRIVER=dummy`, a temporary database (`REHAB_DB`) and a temporary difficulty file (`REHAB_GAME_STATE`) and calibration file (`REHAB_EMG_CALIBRATION`), and skip the start and results screens (`REHAB_SKIP_SCREENS`), so they never touch real data.
+The tests set `SDL_VIDEODRIVER=dummy`, a temporary database (`REHAB_DB`) and a temporary difficulty file (`REHAB_GAME_STATE`) calibration file (`REHAB_EMG_CALIBRATION`) and level progress file (`REHAB_LEVEL_PROGRESS`), and skip the start and results screens (`REHAB_SKIP_SCREENS`), so they never touch real data.
 
 Fine-tuning has its own check, run in the fine-tuning environment: `python -m src.models.finetune_moment --smoke` (see [fine_tuning_moment.md](fine_tuning_moment.md)).
 

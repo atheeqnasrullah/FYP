@@ -2,6 +2,11 @@ import argparse, time
 from src.realtime.pipeline import command_bus, start, shutdown
 from src.realtime.simulator import start_simulator
 from src.games.effort import parse_required
+from src.games.levels import parse_level
+
+def level_arg(value):
+    try: return parse_level(value)
+    except ValueError as e: raise argparse.ArgumentTypeError(str(e))
 
 def effort_arg(value):
     try: return parse_required(value)
@@ -14,6 +19,7 @@ def main():
     parser.add_argument("--patient",default="P01")
     parser.add_argument("--difficulty",choices=["auto","easy","medium","hard"],help="game difficulty; auto adapts to the patient (default from config/settings.yaml)")
     parser.add_argument("--duration",type=int,help="session length in seconds; 0 = no time limit (default from config/settings.yaml)")
+    parser.add_argument("--level",type=level_arg,help="choose (level panel at the start, default), free (free play at --difficulty) or 1-7")
     parser.add_argument("--effort",type=effort_arg,help="Webcam + EMG mode: grip effort needed for grip actions, as %% of the patient's calibrated strongest squeeze (0-100, 0 = off) or auto to follow the difficulty (default from config/settings.yaml)")
     parser.add_argument("--emg-source",choices=["serial","replay"],default="serial",help="live mode: ESP32 serial stream or a Dataset/ recording replayed in real time")
     args=parser.parse_args()
@@ -33,6 +39,7 @@ def main():
         game.control_mode=args.mode
         game.emg_source=args.emg_source
         if args.effort is not None: game.effort_setting=args.effort
+        if args.level is not None: game.level_request=args.level
         if args.difficulty: game.difficulty_mode=args.difficulty
         if args.duration is not None: game.session_seconds=max(0,args.duration)
         print(f"Pygame video driver: {__import__('pygame').display.get_driver()}; window info: {__import__('pygame').display.get_wm_info()}",flush=True)

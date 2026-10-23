@@ -188,6 +188,9 @@ class CarDriving(BaseGame):
             return 1
         return current
 
+    def level_count(self):
+        return getattr(self, "stars_caught", 0)
+
     def new_target(self):
         choices = [lane for lane in range(self.LANES) if lane != self.lane]
         self.target_lane = random.choice(choices)
@@ -336,7 +339,7 @@ class CarDriving(BaseGame):
         last_spawn = 0
         last_cmd = None
         collision_until = 0
-        caught = 0
+        self.stars_caught = caught = 0
         self.begin()
         self.new_target()
 
@@ -406,7 +409,7 @@ class CarDriving(BaseGame):
             for star in list(self.stars):
                 if self.CAR_Y - 30 <= star["y"] <= self.CAR_Y + 25 and star["lane"] == self.lane:
                     self.stars.remove(star)
-                    caught += 1
+                    caught += 1; self.stars_caught = caught
                     self.score += 15
                     self.sound("chest")
                     self.popup("Star caught! +15", GOLD, 38)

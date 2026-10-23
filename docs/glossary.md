@@ -4,7 +4,7 @@
 |---|---|
 | ADC | Analog-to-digital converter. The ESP32's 12-bit ADC turns the sensor voltage into 0-4095 |
 | Attempt | One scored action in a game: target movement, detected movement, correct or not, reaction time, EMG values |
-| Auto difficulty | Mode that raises the level by 0.5 at 80%+ accuracy and lowers it at 40% or less, over the last 6 attempts |
+| Auto difficulty | Free-play mode that raises the difficulty by 0.5 at 80%+ accuracy and lowers it at 40% or less, over the last 6 attempts |
 | Command bus | Queue (50 slots) carrying fused commands from the fusion thread to the game |
 | EMG | Electromyography: electrical activity of muscles, measured on the skin |
 | Effort threshold | In Webcam + EMG mode, the share of the patient's strongest squeeze a grip must reach before a pop, brake, grab or pick-up counts (`game_effort_required`, auto 25-60%) |
@@ -14,6 +14,7 @@
 | LDA, SVM, RF | Linear discriminant analysis, support vector machine, random forest: classic classifiers used for the offline baseline |
 | LoRA | Low-rank adaptation: training small extra matrices instead of the whole model during fine-tuning |
 | LOSO | Leave-one-subject-out: train on all people but one, test on that one, repeat for everyone |
+| Game level | One of seven stages of a game (1 Warm-up to 7 Champion), each with a fixed difficulty and a goal; the next opens a day after a pass |
 | Grip effort | EMG RMS as a percentage of the patient's range from rest to strongest squeeze, measured by the muscle check |
 | MAV | Mean absolute value of a window: an activity measure |
 | MediaPipe | Google's library for hand tracking from camera images |

@@ -1,6 +1,6 @@
 # Backend API reference
 
-One FastAPI app serves 32 endpoints: 12 in the session API (`backend/app.py`, used by the games) and 20 in the web app API (`backend/webapi.py`, used by RehabHub). It has no authentication, so it must stay on `127.0.0.1`. CORS allows only the Vite dev server (`http://localhost:5173`, `http://127.0.0.1:5173`). Interactive docs are at `/docs` while the API runs.
+One FastAPI app serves 33 endpoints: 12 in the session API (`backend/app.py`, used by the games) and 21 in the web app API (`backend/webapi.py`, used by RehabHub). It has no authentication, so it must stay on `127.0.0.1`. CORS allows only the Vite dev server (`http://localhost:5173`, `http://127.0.0.1:5173`). Interactive docs are at `/docs` while the API runs.
 
 Start it with `python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000`. The database is `data/rehab.db`, or the path in the `REHAB_DB` environment variable.
 
@@ -38,7 +38,8 @@ The built web app is also served at `/ui` when `webapp/dist` exists.
 | POST | `/sessions/sync-pending` | none | Imports `data/logs/pending_sessions.jsonl`; `{"imported","failed"}` |
 | GET | `/games` | none | Game catalogue (id, name, modes, description, what it trains) and input modes |
 | GET | `/games/status` | none | `{"running","pid","last"}` |
-| POST | `/games/launch` | `{"game","mode","patient_id","difficulty","duration_s","effort"}`; `effort` is `auto` or 0-100, used in `live` and `replay` modes | Starts `main.py`; 400 on bad input, 409 if a game runs |
+| GET | `/games/levels/{patient_id}` | none | `{"days_between", "games": {game id: [7 levels]}}`; each level has `level`, `name`, `goal`, `goal_count`, `state` (`passed`, `open`, `waiting`, `locked`), `opens_on`, `stars`, `best`, `plays` |
+| POST | `/games/launch` | `{"game","mode","patient_id","difficulty","duration_s","level","effort"}`; `level` is `choose` (level panel, default), `free` or 1-7; `effort` is `auto` or 0-100, used in `live` and `replay` modes | Starts `main.py`; 400 on bad input, 409 if a game runs |
 | POST | `/games/stop` | none | Terminates the running game (kills it after 5 s) |
 | GET | `/games/log` | `lines` (1-1000, default 80) | Last lines of `data/logs/dashboard_game.log` |
 | GET | `/datasets` | none | CSV files under `Dataset/` and `data/raw/emg/` with rows, columns, size, category (normal, patient, recorded) |
@@ -54,7 +55,7 @@ For `Dataset/` files (one signal column plus `movement_label`), features and com
 
 - **Patient:** `patient_id` (regex `^P[A-Za-z0-9_-]{1,20}$`), `age` 0-120, `affected_side`, `stroke_date`, `notes` (all optional except the ID).
 - **Attempt:** `target_movement`, `detected_movement`, `correct`, `reaction_time_ms` (>= 0); optional `ts`, `vision_label`, `emg_rms`, `emg_mav`, `confidence`, `input_source` (for example `Camera + EMG sensor`), `emg_activity_pct` (effort 0-100), `effort_required_pct` and `effort_ok` (grip actions in Webcam + EMG mode only; otherwise null). The four optional input fields are stored, returned by `/sessions/{sid}/attempts` and included in the CSV export.
-- **Session:** `patient_id`, `game_name`, `total_score`, `duration_s` (>= 0), `attempts`.
+- **Session:** `patient_id`, `game_name`, `total_score`, `duration_s` (>= 0), `attempts`; optional `level` (1-7, null in free play) and `level_passed`, stored on the session row.
 - **Launch:** `game` (balloon, car, treasure, shape), `mode` (vision, live, replay, keyboard, sim; replay runs live mode with `--emg-source replay`), `patient_id`, `difficulty` (auto, easy, medium, hard), `duration_s` (0-3600, default 180).
 
 ## Session upload from games

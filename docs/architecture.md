@@ -228,7 +228,7 @@ FYP/
 ├── data/                     models/ (MediaPipe), raw/, features/, logs/
 ├── models/moment/            committed fine-tuning runs (LoRA adapters, metrics, logs)
 ├── results/                  tables/, figures/, splits.json
-├── tests/                    57 pytest tests
+├── tests/                    62 pytest tests
 └── docs/                     this documentation
 ```
 

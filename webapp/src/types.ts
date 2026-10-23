@@ -26,6 +26,25 @@ export interface Session {
   duration_s: number
   accuracy: number
   attempts?: number
+  level?: number | null
+  level_passed?: number | null
+}
+
+export interface LevelRow {
+  level: number
+  name: string
+  goal: string
+  goal_count: number
+  state: 'passed' | 'open' | 'waiting' | 'locked'
+  opens_on: string | null
+  stars: number
+  best: number
+  plays: number
+}
+
+export interface LevelProgress {
+  days_between: number
+  games: Record<string, LevelRow[]>
 }
 
 export interface Attempt {
@@ -96,6 +115,7 @@ export interface GameStatus {
     difficulty?: string
     duration_s?: number
     effort?: string
+    level?: string
     started_at: string
     exit_code: number | null
   } | null

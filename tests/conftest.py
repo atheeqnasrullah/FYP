@@ -12,3 +12,4 @@ import tempfile
 _state = tempfile.mkdtemp(prefix="rehab_test_")
 os.environ.setdefault("REHAB_GAME_STATE", os.path.join(_state, "game_levels.json"))
 os.environ.setdefault("REHAB_EMG_CALIBRATION", os.path.join(_state, "emg_calibration.json"))
+os.environ.setdefault("REHAB_LEVEL_PROGRESS", os.path.join(_state, "level_progress.json"))

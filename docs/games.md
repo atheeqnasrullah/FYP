@@ -1,4 +1,4 @@
-# Games, session flow and adaptive difficulty
+# Games, levels, session flow and adaptive difficulty
 
 Each game asks for one target movement at a time, logs every attempt as correct or not, and scores 10 points per correct movement, plus 5 more while the patient has 3 or more correct in a row.
 
@@ -19,6 +19,33 @@ Each game asks for one target movement at a time, logs every attempt as correct 
 | Shape Matching | Each drop in a hole (right or wrong hole) | Round complete +20; dropping away from any hole is not counted |
 
 In Webcam + EMG mode a grip action also needs enough muscle effort (see [Grip effort threshold](#grip-effort-threshold)), and every game pauses on a waiting screen when EMG data stops.
+
+## Levels (1 to 7)
+
+Every game has seven levels, and the patient picks one on the **level panel**, the first screen of the game (`src/games/levels.py`, `BaseGame.level_select_screen`). With one new level a day, a patient can complete a game in a week.
+
+| Level | Name | Difficulty | Balloon Pop | Car Driving | Treasure Hunt | Shape Matching |
+|---|---|---|---|---|---|---|
+| 1 | Warm-up | 1.0 | Pop 6 balloons | Catch 4 stars | Collect 2 chests | Place 3 shapes |
+| 2 | Getting going | 1.7 | Pop 8 balloons | Catch 5 stars | Collect 3 chests | Place 4 shapes |
+| 3 | Steady | 2.3 | Pop 10 balloons | Catch 6 stars | Collect 4 chests | Place 6 shapes |
+| 4 | Building up | 3.0 | Pop 12 balloons | Catch 8 stars | Collect 5 chests | Place 8 shapes |
+| 5 | Stronger | 3.7 | Pop 14 balloons | Catch 10 stars | Collect 6 chests | Place 9 shapes |
+| 6 | Challenge | 4.3 | Pop 16 balloons | Catch 12 stars | Collect 7 chests | Place 10 shapes |
+| 7 | Champion | 5.0 | Pop 18 balloons | Catch 14 stars | Collect 8 chests | Place 12 shapes |
+
+- **Difficulty** is fixed for the whole level (it does not adapt during play) and sets the game parameters in [Adaptive difficulty](#adaptive-difficulty); for example, balloons rise faster and are smaller at higher levels. In Webcam + EMG mode with `game_effort_required: auto`, the grip effort needed also rises, from 25% at level 1 to 60% at level 7.
+- **Passing:** reach the goal before the session time runs out (3 minutes by default; with no time limit the goal alone ends it). The level ends 1.6 s after the goal is reached, with "Level n complete!". Stars (1-3, from accuracy) are kept for the best pass.
+- **Opening the next level:** level 1 is always open. Level n opens `level_days_between` days after level n-1 is first passed (default 1: the next day; 7 gives a level a week, for a 7-week programme; 0 opens it straight away). Passed and open levels can be replayed at any time.
+- **Progress** is kept per patient and per game in `data/logs/level_progress.json` (plays, best count, stars, date first passed). Each saved session also records `level` and `level_passed`.
+- **Free play** (the eighth card) is the earlier mode: no goal, difficulty from `game_difficulty` (auto adapts during play).
+
+**Level panel.** Seven cards plus Free play. Each card shows the level number, name and goal, and a badge: *Done* (green, with the stars earned), *Play* (open, gold), *Soon* (passed the previous level; shows "Opens tomorrow" or the date) or *Locked* ("Pass level n first"). The lowest open level not yet passed is highlighted, and it starts by itself after 45 s. To choose:
+
+- **Camera:** move the hand over a card, then hold it open for 1.5 s (a green bar fills along the card).
+- **Keyboard and mouse:** arrows or keys 1-7 (F for free play), then Enter or Space; or click a card.
+
+Choosing a locked card shows why it is locked and keeps the panel open. While playing, the top right shows the goal progress ("Level 4: 9 of 12 balloons popped"). The results screen says whether the level was passed and when the next one opens ("Level 5 opens tomorrow. See you then!"), or how far the patient got ("8 of 12 balloons popped. Try level 4 again to open level 5!").
 
 ## Input feedback on screen
 
@@ -53,7 +80,7 @@ The MD0437 gives an activity envelope in ADC units, not a force, so this is rela
 
 | Setting | Effort needed |
 |---|---|
-| `auto` (default) | Follows the difficulty level: 25% at level 1 to 60% at level 5 (42.5% at medium). Auto difficulty lowers it after weak attempts and raises it after successes |
+| `auto` (default) | Follows the difficulty: 25% at game level 1 to 60% at level 7 (in free play, 25% at difficulty 1.0 to 60% at 5.0, 42.5% at medium). Auto difficulty lowers it after weak attempts and raises it after successes |
 | `20` to `65` (any 0-100) | Fixed share of the strongest squeeze |
 | `0` | Off: any fist the camera sees counts; effort is still recorded |
 
@@ -72,18 +99,19 @@ One fist is one attempt. The fist fires once when it first reaches the threshold
 
 ## Session flow
 
-1. **Start screen:** how to play; start with Space or by holding an open hand.
-2. **Muscle check** (Webcam + EMG mode only): relax 3 s, squeeze 3 s; see [Grip effort threshold](#grip-effort-threshold).
-3. **Countdown:** 3-2-1.
-4. **Play:** timer at the top (180 s by default), a prompt naming the next movement, popups for streaks and level changes. Enter pauses (paused time is not counted), M mutes, Esc ends early.
-5. **Results:** score, accuracy, good movements per movement type, best streak, average reaction time, previous best, average muscle activity, strong grips, and 1-3 stars (3 stars at 80% accuracy or more, 2 at 50% or more).
-6. **Save:** upload to the API, or queue in `data/logs/pending_sessions.jsonl`; in auto mode the level is saved to `data/logs/game_levels.json`.
+1. **Level panel:** choose level 1-7 or free play (see [Levels](#levels-1-to-7)); skipped when the level was set in the web Game Launcher or with `--level`.
+2. **Start screen:** the level and its goal, how to play; start with Space or by holding an open hand.
+3. **Muscle check** (Webcam + EMG mode only): relax 3 s, squeeze 3 s; see [Grip effort threshold](#grip-effort-threshold).
+4. **Countdown:** 3-2-1.
+5. **Play:** timer at the top (180 s by default), a prompt naming the next movement, popups for streaks and level changes. Enter pauses (paused time is not counted), M mutes, Esc ends early.
+6. **Results:** level passed or not and when the next level opens, score, accuracy, good movements per movement type, best streak, average reaction time, previous best, average muscle activity, strong grips, and 1-3 stars (3 stars at 80% accuracy or more, 2 at 50% or more).
+7. **Save:** upload to the API, or queue in `data/logs/pending_sessions.jsonl`; level progress goes to `data/logs/level_progress.json`, and in free play with auto difficulty the difficulty is saved to `data/logs/game_levels.json`.
 
 Session length, difficulty, sound and the start/results screens come from `game_session_seconds`, `game_difficulty`, `game_sound` and `game_show_screens` in `config/settings.yaml`, or from `--duration` and `--difficulty` on the command line or in the web app's Game Launcher. In Webcam + EMG mode the muscle check runs between the start screen and the countdown.
 
 ## Adaptive difficulty
 
-Levels run from 1.0 (easiest) to 5.0 (hardest). Presets: easy 1.5, medium 3.0, hard 4.5; presets never change during a session.
+Difficulty runs from 1.0 (easiest) to 5.0 (hardest). Game levels 1-7 map onto it (1.0, 1.7, 2.3, 3.0, 3.7, 4.3, 5.0) and never change during a level. In free play the presets are easy 1.5, medium 3.0, hard 4.5 (fixed), or auto:
 
 Auto mode (`src/games/difficulty.py`) starts at the patient's saved level for that game (or 3.0). After at least 4 attempts since the last change it looks at the last 6 attempts:
 
@@ -114,7 +142,8 @@ Each game turns the level into concrete parameters, interpolated linearly from l
 |---|---|
 | `src/games/game_engine.py` | `BaseGame`: input, scoring, streaks, timer, pause, start/results screens, input strip and action cards, muscle check and grip gate (`grip()`, `effort_ok()`, `log_weak_grip()`), session save, latency log |
 | `src/games/effort.py` | Calibration maths, effort %, effort needed, per-patient calibration file |
-| `src/games/difficulty.py` | Levels, presets, auto adaptation, per-patient memory |
+| `src/games/difficulty.py` | Difficulty 1.0-5.0, presets, auto adaptation, per-patient memory |
+| `src/games/levels.py` | The seven levels: names, goals, difficulty per level, when levels open, per-patient progress file |
 | `src/games/summary.py` | Results summary, stars, encouragement text |
 | `src/games/audio.py` | Synthesised sound effects |
 | `src/games/balloon_pop.py`, `car_driving.py`, `treasure_hunt.py`, `shape_matching.py` | The four games |

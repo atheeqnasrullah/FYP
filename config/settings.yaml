@@ -24,5 +24,7 @@ game_sound: true            # sound effects (press M in a game to mute)
 game_show_screens: true     # start screen, countdown and results screen
 # Grip effort threshold (Webcam + EMG mode only): a pop, brake, gold grab or shape pick-up
 # counts only when the grip reaches this share of the patient's calibrated strongest squeeze.
+game_levels: true           # level panel (levels 1-7 and free play) at the start of each game; false = free play
+level_days_between: 1       # days after passing a level before the next opens: 1 = a new level a day, 7 = a level a week, 0 = straight away
 game_effort_required: auto  # auto follows the difficulty (25% easiest to 60% hardest), or a fixed 0-100; 0 = off (--effort overrides)
 game_emg_calibration: true  # relax-then-squeeze check at the start of each Webcam + EMG session; false reuses the patient's saved check

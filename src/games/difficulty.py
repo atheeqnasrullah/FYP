@@ -32,10 +32,13 @@ def _load_state():
 
 
 class Difficulty:
-    def __init__(self, mode="auto", patient="P01", game="Game"):
-        self.mode = mode if mode in MODES else "auto"
+    def __init__(self, mode="auto", patient="P01", game="Game", level=None):
+        """level fixes the difficulty for a game level (see levels.py); it never adapts or saves."""
+        self.mode = "level" if level is not None else mode if mode in MODES else "auto"
         self.patient, self.game = patient, game
-        if self.mode == "auto":
+        if self.mode == "level":
+            pass
+        elif self.mode == "auto":
             saved = _load_state().get(patient, {}).get(game)
             level = saved if isinstance(saved, (int, float)) else PRESETS["medium"]
         else:

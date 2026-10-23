@@ -17,6 +17,7 @@ export function SessionModal({ session, onClose }: { session: Session; onClose: 
     <Modal title={`Session #${session.session_id} · ${gameLabel(session.game_name)}`} onClose={onClose} wide>
       <p className="muted">
         Patient {session.patient_id} · {dateTime(session.started_at)}
+        {session.level ? ` · Level ${session.level}: ${session.level_passed ? 'goal reached' : 'goal not reached'}` : ''}
       </p>
       <div className="stats stats-sm">
         <Stat label="Score" value={session.total_score} />

@@ -69,3 +69,16 @@ def test_grip_effort_is_stored_and_exported(client):
 def test_web_launcher_rejects_bad_effort(client):
     r = client.post("/games/launch", json={"game": "balloon", "mode": "live", "patient_id": "P01", "effort": "150"})
     assert r.status_code == 400 and "0 to 100" in r.json()["detail"]
+
+
+def test_level_progress_endpoint_and_level_validation(client):
+    data = client.get("/games/levels/P01").json()
+    assert set(data["games"]) == {"balloon", "car", "treasure", "shape"} and len(data["games"]["balloon"]) == 7
+    assert data["games"]["balloon"][0]["state"] in ("open", "passed")
+    r = client.post("/games/launch", json={"game": "balloon", "mode": "keyboard", "patient_id": "P01", "level": "9"})
+    assert r.status_code == 400 and "1-7" in r.json()["detail"]
+    client.post("/patients", json={"patient_id": "P05"})
+    sid = client.post("/sessions", json={"patient_id": "P05", "game_name": "Balloon_Pop", "total_score": 60, "duration_s": 50,
+                                         "attempts": [ATTEMPT], "level": 2, "level_passed": True}).json()["session_id"]
+    row = next(s for s in client.get("/patients/P05/sessions").json() if s["session_id"] == sid)
+    assert row["level"] == 2 and row["level_passed"] == 1

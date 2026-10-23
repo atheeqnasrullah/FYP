@@ -20,7 +20,7 @@ The system is a research prototype, not a certified medical device.
 | [signal_processing_and_vision.md](signal_processing_and_vision.md) | EMG filtering, windows and features; MediaPipe gesture rules; fusion |
 | [games.md](games.md) | The four games, scoring, session flow, adaptive difficulty |
 | [web_app.md](web_app.md) | RehabHub pages, running and code layout |
-| [api_reference.md](api_reference.md) | All 32 API endpoints and data models |
+| [api_reference.md](api_reference.md) | All 33 API endpoints and data models |
 | [datasets.md](datasets.md) | The `Dataset/` folder: format, quality, activity per movement |
 
 ## Development, evaluation and research
@@ -28,7 +28,7 @@ The system is a research prototype, not a certified medical device.
 | Document | Covers |
 |---|---|
 | [developer_guide.md](developer_guide.md) | Design rules, module map, adding games and endpoints, environment variables |
-| [testing_and_evaluation.md](testing_and_evaluation.md) | The 57 tests, classifier and activity results, latency, evaluation still to do |
+| [testing_and_evaluation.md](testing_and_evaluation.md) | The 62 tests, classifier and activity results, latency, evaluation still to do |
 | [model_comparison.md](model_comparison.md) | Every model compared on the same splits: LDA, SVM, random forest, MOMENT before and after fine-tuning, with and without public data |
 | [model_card_baseline.md](model_card_baseline.md) | The offline LDA/SVM/RF baseline |
 | [fine_tuning_moment.md](fine_tuning_moment.md) | MOMENT-1 fine-tuning: preprocessing, environment, results, how to use the saved models |
@@ -45,7 +45,7 @@ The system is a research prototype, not a certified medical device.
 
 ## Status at a glance (2026-10-18)
 
-- **Working:** webcam control of four games, adaptive difficulty, session storage, RehabHub web app, Streamlit dashboard, offline session queue, EMG replay from `Dataset/`. All 57 tests pass. In Webcam + EMG mode a grip only counts above a per-patient effort threshold.
+- **Working:** webcam control of four games, adaptive difficulty, session storage, RehabHub web app, Streamlit dashboard, offline session queue, EMG replay from `Dataset/`. All 62 tests pass. Every game has 7 levels, one opening per day. In Webcam + EMG mode a grip only counts above a per-patient effort threshold.
 - **Models:** best EMG classifier is frozen MOMENT-1 features + random forest, 48.1% leave-one-subject-out on 7 movements (chance 14.3%); fine-tuned MOMENT (LoRA) 45.9%. Public data (UCI, EMG-EPN-612) gave no gain on our volunteers ([model_comparison.md](model_comparison.md)). Fine-tuned models in `models/moment/`.
 - **Not built:** login, patient-therapist communication, wireless EMG, battery pack.
 - **Not measured:** latency, webcam gesture accuracy, usability.

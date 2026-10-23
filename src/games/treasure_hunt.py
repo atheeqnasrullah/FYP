@@ -102,6 +102,9 @@ class TreasureHunt(BaseGame):
                     queue.append(nxt)
         return None
 
+    def level_count(self):
+        return getattr(self, "chests_collected", 0)
+
     def new_island(self):
         """Random island whose chests are all reachable; harder levels add chests and obstacles."""
         chests_wanted = max(2, round(self.difficulty.value(2, 5)))
@@ -194,6 +197,7 @@ class TreasureHunt(BaseGame):
                 return
             if self.log(cmd, pos=self.cell_center(self.player), title="Gold grabbed" if cmd == self.target else None, card=True, grip=True):
                 self.chests[self.player] = "collected"
+                self.chests_collected = getattr(self, "chests_collected", 0) + 1
                 self.score += 25
                 self.sound("chest")
                 self.popup("+25 gold!", GOLD, 40)

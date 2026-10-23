@@ -333,3 +333,39 @@ def test_replay_calibration_uses_the_recordings_rest_and_fist():
     from src.realtime.emg_replay import replay_calibration
     rest, peak = replay_calibration("healthy", "S02")
     assert 0 < rest < peak
+
+
+def test_level_ends_when_goal_reached_and_opens_next_level_tomorrow(monkeypatch):
+    import src.games.balloon_pop as balloon
+    from src.games import levels
+    monkeypatch.setattr(balloon.random, "randint", lambda a, b: (a + b) // 2)
+    original_init = balloon.BalloonPop.__init__
+    def level_one(self, *a, **k):
+        original_init(self, *a, **k); self.level_request = 1; self.session_seconds = 0
+    monkeypatch.setattr(balloon.BalloonPop, "__init__", level_one)
+    script = lambda f: "Down" if f < 70 else every(10, "Hand_Close")(f)
+    game, saved = run_game(balloon.BalloonPop, script, monkeypatch, frames=2000)
+    assert game.level == 1 and game.level_goal == 6 and game.difficulty.level == 1.0
+    assert saved["level"] == 1 and saved["level_passed"] is True
+    assert sum(a["correct"] for a in saved["attempts"]) == 6                 # stopped soon after the goal
+    rows = levels.level_status("P01", "Balloon_Pop")
+    assert rows[0]["state"] == "passed" and rows[1]["state"] == "waiting"
+    assert game.level_message()[0] == "Level 1 complete!" and "tomorrow" in game.level_message()[1]
+
+
+def test_level_panel_picks_with_keys_and_refuses_locked_levels(monkeypatch, tmp_path):
+    import pygame
+    from datetime import date, timedelta
+    from src.games import levels
+    from src.games.car_driving import CarDriving
+    monkeypatch.setenv("REHAB_LEVEL_PROGRESS", str(tmp_path / "levels.json"))
+    levels.record_result("P01", "Car_Driving", 1, 4, True, 3, today=date.today() - timedelta(days=1))
+    game = CarDriving(queue.Queue(), "P01")
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+    assert game.level_select_screen() == 2                                      # level 2 opened today: offered first
+    for key in (pygame.K_5, pygame.K_RETURN, pygame.K_f, pygame.K_RETURN):      # 5 is locked, then free play
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=key))
+    assert game.level_select_screen() == "free"
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+    assert game.level_select_screen() is None and not game.running
+    pygame.quit()

@@ -598,6 +598,13 @@ label.inline {
   color: var(--text);
   box-shadow: var(--shadow);
 }
+.segmented button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.segmented button.passed:not(.active) {
+  color: var(--good, #2e9d62);
+}
 
 .badge {
   display: inline-block;

@@ -37,7 +37,7 @@ If port 8000 is taken, use another port and set `backend_url` in `config/setting
 | Vision | MediaPipe hand landmarks: Rest, Hand_Open, Hand_Close, Left, Right, Up, Down; the camera decides every game action | [signal_processing_and_vision.md](docs/signal_processing_and_vision.md) |
 | EMG | MD0437 envelope at 1 kHz over USB serial; RMS/MAV activity shown and logged (not strength) | [hardware.md](docs/hardware.md) |
 | Web app (RehabHub) | Dashboard, patients, sessions, game launcher, EMG dataset explorer, settings | [web_app.md](docs/web_app.md) |
-| API | FastAPI + SQLite, 32 endpoints, local only (no authentication) | [api_reference.md](docs/api_reference.md) |
+| API | FastAPI + SQLite, 33 endpoints, local only (no authentication) | [api_reference.md](docs/api_reference.md) |
 | Data | `Dataset/`: 9 healthy volunteers and 1 stroke patient, 7 movements, 100 Hz | [datasets.md](docs/datasets.md) |
 | EMG classifiers (offline research) | LDA, SVM, random forest and MOMENT-1 (fine-tuned models in `models/moment/`) | [model_comparison.md](docs/model_comparison.md) |
 
@@ -61,7 +61,7 @@ src/               acquisition, preprocessing,   webapp/     RehabHub (React + T
                    evaluation, vision, fusion,   firmware/   ESP32 sketch
                    realtime, games, utils        config/     settings.yaml, labels.yaml
 Dataset/           EMG recordings                models/     fine-tuned MOMENT-1 runs
-docs/              documentation                 tests/      57 pytest tests
+docs/              documentation                 tests/      62 pytest tests
 ```
 
 `python -m pytest -q` runs the tests. Fine-tuning uses a separate environment (`.venv-finetune`, see [docs/fine_tuning_moment.md](docs/fine_tuning_moment.md)).

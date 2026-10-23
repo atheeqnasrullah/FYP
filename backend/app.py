@@ -36,6 +36,10 @@ with closing(connect()) as c:
     # Input feedback and the grip effort threshold (Webcam + EMG mode).
     for column,kind in (("input_source","TEXT"),("emg_activity_pct","REAL"),("effort_required_pct","REAL"),("effort_ok","INTEGER")):
         if column not in attempt_columns: c.execute(f"ALTER TABLE attempts ADD COLUMN {column} {kind}")
+    # Game level played (1-7, null in free play) and whether its goal was reached.
+    session_columns={row[1] for row in c.execute("PRAGMA table_info(sessions)")}
+    for column in ("level","level_passed"):
+        if column not in session_columns: c.execute(f"ALTER TABLE sessions ADD COLUMN {column} INTEGER")
     c.commit()
 
 class Patient(BaseModel): patient_id:str=Field(pattern=r"^P[A-Za-z0-9_-]{1,20}$"); age:int|None=Field(default=None,ge=0,le=120); affected_side:str|None=None; stroke_date:str|None=None; notes:str|None=None
@@ -43,7 +47,7 @@ class Attempt(BaseModel): ts:str|None=None; target_movement:str; detected_moveme
 class SessionStart(BaseModel): patient_id:str; game_name:str
 class AttemptBatch(BaseModel): attempts:list[Attempt]=Field(default_factory=list)
 class SessionClose(BaseModel): total_score:int; duration_s:int=Field(ge=0)
-class Session(BaseModel): patient_id:str; game_name:str; total_score:int; duration_s:int=Field(ge=0); attempts:list[Attempt]=Field(default_factory=list)
+class Session(BaseModel): patient_id:str; game_name:str; total_score:int; duration_s:int=Field(ge=0); attempts:list[Attempt]=Field(default_factory=list); level:int|None=Field(default=None,ge=1,le=7); level_passed:bool|None=None
 
 def insert_attempts(c,sid,attempts):
     c.executemany("INSERT INTO attempts(session_id,ts,target_movement,detected_movement,vision_label,correct,reaction_time_ms,emg_rms,emg_mav,confidence,input_source,emg_activity_pct,effort_required_pct,effort_ok) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -70,7 +74,7 @@ def create_session(s:Session):
         if not c.execute("SELECT 1 FROM patients WHERE patient_id=?",(s.patient_id,)).fetchone(): raise HTTPException(404,"Create patient before uploading a session")
         acc=sum(a.correct for a in s.attempts)/len(s.attempts) if s.attempts else 0.
         now=datetime.now(timezone.utc).isoformat()
-        cur=c.execute("INSERT INTO sessions(patient_id,game_name,started_at,ended_at,total_score,duration_s,accuracy) VALUES(?,?,?,?,?,?,?)",(s.patient_id,s.game_name,now,now,s.total_score,s.duration_s,acc)); sid=cur.lastrowid
+        cur=c.execute("INSERT INTO sessions(patient_id,game_name,started_at,ended_at,total_score,duration_s,accuracy,level,level_passed) VALUES(?,?,?,?,?,?,?,?,?)",(s.patient_id,s.game_name,now,now,s.total_score,s.duration_s,acc,s.level,None if s.level_passed is None else int(s.level_passed))); sid=cur.lastrowid
         insert_attempts(c,sid,s.attempts); c.commit()
     return {"session_id":sid,"accuracy":acc}
 
