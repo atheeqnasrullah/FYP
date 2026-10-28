@@ -83,15 +83,16 @@ def logits_predict(model, X, mask, device):
 def plot(table, dest):
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    loso = table[(table.evaluation == "loso") & (table.test == "healthy")].groupby(["family", "method"], sort=False).accuracy.mean().reset_index()
+    healthy = table[(table.evaluation == "loso") & (table.test == "healthy")]
+    loso = healthy.groupby(["family", "method"], sort=False).accuracy.mean().reset_index()
     colours = {"Classical, 200 ms windows": "#9aa5b1", "Classical, 5.12 s windows": "#6b7785", "MOMENT before fine-tuning": "#9cc3e6", "MOMENT after fine-tuning": "#1f6fb5"}
     fig, ax = plt.subplots(figsize=(9, 0.42 * len(loso) + 1.2))
     ypos = np.arange(len(loso))[::-1]
     ax.barh(ypos, loso.accuracy * 100, color=[colours.get(f, "#999") for f in loso.family])
     for yv, acc in zip(ypos, loso.accuracy): ax.text(acc * 100 + 0.5, yv, f"{acc:.1%}", va="center", fontsize=9)
     ax.axvline(100 / 7, color="#c0392b", linestyle="--", linewidth=1); ax.text(100 / 7 + 0.5, ypos[-1] - 0.7, "chance 14.3%", color="#c0392b", fontsize=8)
-    ax.set_yticks(ypos, loso.method, fontsize=9); ax.set_xlabel("Leave-one-subject-out accuracy, 8 healthy volunteers (%)")
-    ax.set_xlim(0, max(60, loso.accuracy.max() * 100 + 8))
+    ax.set_yticks(ypos, loso.method, fontsize=9); ax.set_xlabel(f"Leave-one-subject-out accuracy, {healthy.fold.nunique()} healthy volunteers (%)")
+    ax.set_xlim(0, min(100, max(60, loso.accuracy.max() * 100 + 8)))
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in colours.values()]
     ax.legend(handles, colours.keys(), loc="upper right", fontsize=8, frameon=True, framealpha=0.95)
     ax.set_title("Every model on the same subject splits (7 movements)")

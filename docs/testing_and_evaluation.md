@@ -46,9 +46,17 @@ Healthy volunteers in `Dataset/` (9 subjects, 7 movements, chance 14.3%), 36,873
 
 Macro F1 for the SVM across subjects is 0.321.
 
-With S01 excluded (the 8 subjects used for fine-tuning; `--exclude-subjects S01`), the SVM reaches 37.4% leave-one-subject-out and 39.2% within-subject; this is the baseline for MOMENT-1 ([fine_tuning_moment.md](fine_tuning_moment.md)).
+**Re-run 2026-10-28 on all current data** (19 volunteers S02-S20, S01 excluded with `--exclude-subjects S01`; 80,887 windows; tested also on the two stroke patients `SP02` and `SP03`, 8,386 windows). This is the baseline for MOMENT-1 ([fine_tuning_moment.md](fine_tuning_moment.md)); `results/tables/baseline_finetune_subjects_metrics.csv`:
 
-Per-movement recall of the SVM across subjects (`confusion_baseline_public_SVM_loso.png`):
+| Model | Leave-one-subject-out | Within-subject (70/30 in time) | Train healthy, test stroke patients |
+|---|---|---|---|
+| LDA | 40.8% | 41.2% | 23.3% |
+| SVM (RBF, C=10) | **43.8%** (macro F1 0.419) | **44.7%** | 30.7% |
+| Random forest | 41.6% | 42.1% | **31.6%** |
+
+SVM recall per movement on 19 volunteers: Rest 79%, Hand_Close 66%, Hand_Open 50%, Down 41%, Right 26%, Left 25%, Up 18%. The saved model `src/models/saved/emg_model.joblib` is still the 2026-10-18 one (the re-run used `--no-save`).
+
+Per-movement recall of the SVM across subjects, 2026-10-18 run (`confusion_baseline_public_SVM_loso.png`):
 
 | Movement | Recall |
 |---|---|
@@ -68,7 +76,7 @@ What this shows:
 
 ## Results: MOMENT-1 and the full model comparison
 
-On the same 8 volunteers, MOMENT-1-small fine-tuned with LoRA reaches 45.9% leave-one-subject-out (48.7% holdout), against 37.2% for the SVM on 200 ms windows. On equal 5.12 s windows the classical models catch up: SVM 47.3%, and frozen MOMENT features with a random forest 48.1%, the best result. Public data (UCI, EMG-EPN-612) did not raise accuracy on our volunteers. Fine-tuning results before 2026-10-21 were affected by a gradient-checkpointing bug and have been replaced. Full tables, per movement and per volunteer: [model_comparison.md](model_comparison.md).
+On 19 volunteers (2026-10-28), MOMENT-1-small fine-tuned with LoRA reaches 68.2% leave-one-subject-out (82.2% holdout on S18-S20), against 43.8% for the SVM on 200 ms windows. On equal 5.12 s windows the classical models catch up: SVM 71.7%, and frozen MOMENT features with a random forest 72.1%, the best result. The new volunteers S10-S20 are much easier (80-94%) than S02-S09 (44-49%), so per-group results are reported as well. With the earlier 8 volunteers the same ranking held at lower levels (best 48.1%, LoRA 45.9%); public data (UCI, EMG-EPN-612), tested then, did not raise accuracy. Full tables, per movement and per volunteer: [model_comparison.md](model_comparison.md).
 
 ## Results: EMG activity per movement
 

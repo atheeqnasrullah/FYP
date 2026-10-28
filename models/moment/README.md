@@ -27,7 +27,7 @@ models/moment/
     └── folds/<test subjects>/       adapter_config.json, adapter_model.safetensors, fold.json (train/validation/test subjects)
 ```
 
-`holdout` runs have one fold (test S07+S08+S09). `loso` runs have one fold per held-out volunteer.
+`holdout` runs have one fold (test S18+S19+S20 since 2026-10-28; S07+S08+S09 in the 8-volunteer runs of 2026-10-21). `loso` runs have one fold per held-out volunteer (19 in the `_newdata_` runs). The current runs are `small_holdout_newdata_20261027-230705` and `small_loso_newdata_20261027-231047`.
 
 ## Using a fine-tuned model on another laptop
 

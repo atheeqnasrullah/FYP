@@ -46,6 +46,6 @@ The system is a research prototype, not a certified medical device.
 ## Status at a glance (2026-10-18)
 
 - **Working:** webcam control of four games, adaptive difficulty, session storage, RehabHub web app, Streamlit dashboard, offline session queue, EMG replay from `Dataset/`. All 62 tests pass. Every game has 7 levels, one opening per day. In Webcam + EMG mode a grip only counts above a per-patient effort threshold.
-- **Models:** best EMG classifier is frozen MOMENT-1 features + random forest, 48.1% leave-one-subject-out on 7 movements (chance 14.3%); fine-tuned MOMENT (LoRA) 45.9%. Public data (UCI, EMG-EPN-612) gave no gain on our volunteers ([model_comparison.md](model_comparison.md)). Fine-tuned models in `models/moment/`.
+- **Models (2026-10-28, 19 volunteers):** best EMG classifier is frozen MOMENT-1 features + random forest, 72.1% leave-one-subject-out on 7 movements (chance 14.3%); MOMENT fine-tuned again on all current data (LoRA) 68.2%, 57.5% on the two stroke patients. The new volunteers S10-S20 are much easier (80-94%) than S02-S09 (44-49%). Public data (UCI, EMG-EPN-612) gave no gain on the earlier 8 volunteers ([model_comparison.md](model_comparison.md)). Fine-tuned models in `models/moment/`.
 - **Not built:** login, patient-therapist communication, wireless EMG, battery pack.
 - **Not measured:** latency, webcam gesture accuracy, usability.

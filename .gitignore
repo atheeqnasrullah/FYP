@@ -21,6 +21,7 @@ results/tables/*
 !results/figures/
 !results/tables/
 data/processed/moment/
+data/processed/moment_old_*/
 Dataset/public/
 data/processed/public/
 .DS_Store

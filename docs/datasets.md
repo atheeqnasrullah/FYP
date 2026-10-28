@@ -1,15 +1,17 @@
 # Datasets
 
-`Dataset/` (added 2026-10-16) holds MD0437 envelope recordings from 9 healthy volunteers and one stroke patient, already labelled with the same 7 movements the games use. It replaces the older `Datasets/` folder (11 volunteers in wide format, 3 synthetic patients), which was deleted the same day.
+`Dataset/` (added 2026-10-16, extended 2026-10-22) holds MD0437 envelope recordings from 20 healthy volunteers and two stroke patients, already labelled with the same 7 movements the games use. It replaces the older `Datasets/` folder (11 volunteers in wide format, 3 synthetic patients), which was deleted the same day.
 
 ## Contents
 
 | Group | Folder | Subjects | Files | Samples | Notes |
 |---|---|---|---|---|---|
-| Healthy volunteers | `Dataset/Healthy_person/S01`-`S09` | 9 | 61 | 369,435 | One file per movement; S01 has no Rest file, S04 has no Down file |
-| Stroke patient | `Dataset/stroke_patient` | 1 (`SP01`) | 7 | 42,000 | 60 s per movement; used only as an extra test, never for training |
+| Healthy volunteers | `Dataset/Healthy_person/S01`-`S20` | 20 | 138 | 831,435 | One file per movement; S01 has no Rest file, S04 has no Down file. S10-S20 were added on 2026-10-22 |
+| Stroke patients | `Dataset/stroke_patient/SP01/`, `SP02/` | 2 (`SP03`, `SP02`) | 14 | 84,000 | 60 s per movement; used only as an extra test, never for training |
 
-**Patient file change (2026-10-18, 14:58):** the earlier patient `SYN_STROKE_01`, which was generated (synthetic) data, was replaced by `SP01`. Whether `SP01` is a real recording or also generated is not stated in the repository; confirm it before making any claim about stroke patients. `SP01` looks different from the healthy recordings: its values never exceed 200 and never reach 0, and its activity is much lower (table below).
+**Patient ID mismatch (2026-10-22):** the files in `stroke_patient/SP01/` are named `SP01_*.csv` but carry `subject_id` `SP03` inside, so results report them as `SP03`. They are not the earlier `SP01` recordings (different values). Confirm which ID is correct. Both patient folders differ from the volunteer recordings: timestamps start at 0 in every file, values never exceed 291 (both patients hit exactly that maximum), and activity is far lower except for Hand_Close (table below). Whether they are real or generated recordings is not stated in the repository; confirm it before making any claim about stroke patients.
+
+**Earlier patient file change (2026-10-18, 14:58):** the earlier patient `SYN_STROKE_01`, which was generated (synthetic) data, was replaced by `SP01`. Whether `SP01` is a real recording or also generated is not stated in the repository; confirm it before making any claim about stroke patients. `SP01` looks different from the healthy recordings: its values never exceed 200 and never reach 0, and its activity is much lower (table below).
 
 ## Format
 
@@ -27,13 +29,13 @@ timestamp_ms,adc_value,subject_id,movement_label
 
 ## Quality checks
 
-All 68 files were read on 2026-10-18:
+All 68 files were read on 2026-10-18; the 2026-10-22 additions (S10-S20, `SP02`, `SP03`) were checked on 2026-10-28 and are noted where they differ:
 
 - **Sample rate:** 100 Hz, not the 1 kHz of the firmware and `config/settings.yaml`. The dataset tools use 100 Hz automatically.
 - **Missing values:** none.
-- **Zeros:** 59.8% of healthy samples are exactly 0, the envelope's resting floor; `SP01` has none.
-- **Saturation:** 0.57% of healthy samples sit at 4095, mostly during Hand_Close (up to 8.4% in `S02_Hand_Close.csv`); `SP01` never exceeds 200.
-- **Dropped samples:** S01 has about 2,400 short gaps of 20-560 ms (a lossy recording link); the other subjects have at most 7.
+- **Zeros:** 59.8% of healthy samples are exactly 0, the envelope's resting floor (56.3% over all 20 volunteers); `SP01` had none, `SP02`/`SP03` 53.3%.
+- **Saturation:** 0.57% of healthy samples sit at 4095, mostly during Hand_Close (up to 8.4% in `S02_Hand_Close.csv`); `SP01` never exceeded 200, `SP02`/`SP03` never exceed 291.
+- **Dropped samples:** S01 has about 2,400 short gaps of 20-560 ms (a lossy recording link); the other subjects have at most 7, and S10-S20 have none (every step is exactly 10 ms).
 - **Joined recordings:** most files are one 60 s recording (6,000 samples). Exceptions:
     - S01 files run 1,652-7,789 samples, and `S01_Down.csv` has a timestamp that jumps back 32 s.
     - S04 Hand_Close, Hand_Open and Up have 12,000 samples spread over up to 882 s.
@@ -45,24 +47,26 @@ All 68 files were read on 2026-10-18:
 
 Mean `adc_value` over all samples (envelope units, not strength):
 
-| Movement | Healthy (9 volunteers) | Stroke patient `SP01` |
-|---|---|---|
-| Hand_Close | 547.0 | 67.2 |
-| Up | 237.6 | 31.3 |
-| Down | 233.7 | 47.2 |
-| Right | 209.8 | 29.8 |
-| Left | 162.1 | 21.2 |
-| Hand_Open | 39.2 | 15.9 |
-| Rest | 12.4 | 8.3 |
+| Movement | Healthy (20 volunteers) | `SP02` | `SP03` | Earlier patient `SP01` |
+|---|---|---|---|---|
+| Hand_Close | 614.7 | 153.5 | 127.4 | 67.2 |
+| Down | 335.3 | 4.5 | 12.4 | 47.2 |
+| Right | 201.5 | 19.0 | 8.4 | 29.8 |
+| Up | 198.6 | 8.0 | 1.9 | 31.3 |
+| Left | 130.8 | 1.8 | 6.5 | 21.2 |
+| Hand_Open | 40.9 | 1.7 | 1.3 | 15.9 |
+| Rest | 12.9 | 0.3 | 0.2 | 8.3 |
 
-Hand_Close produces by far the most activity, and Rest the least, in both groups. `SP01`'s values are 5-8 times lower than the healthy volunteers' on every movement, with the same order of movements.
+Hand_Close produces by far the most activity, and Rest the least, in every group. The new patients are 4-5 times weaker than the volunteers on Hand_Close and 20-100 times weaker on the other movements.
+
+**The new volunteers are more alike than the first nine.** S10-S20 show nearly the same activity pattern (for example, Down is about 400 on almost all of them), while S02-S09 vary widely (Down from 64 to 413). No recording is a copy of another (no pair correlates above 0.8). This makes S10-S20 much easier to classify (80-94% against 44-49% for S02-S09; see [model_comparison.md](model_comparison.md#per-volunteer-loso-accuracy)).
 
 ## Code
 
 `src/data/public_datasets.py` loads `Dataset/` into the repository's long format (`timestamp_ms, subject_id, session_id, trial_id, emg_value, label, cohort, source, signal_type, fs, file`):
 
-- Sources: `healthy` (S01-S09) and `stroke_patient`; `public` in the feature builder means both.
-- Each file is split into segments at gaps over 1 s or backwards timestamps, giving 73 segments (66 healthy, 7 patient); each segment is one trial, so windows never cross a gap.
+- Sources: `healthy` (S01-S20, `Healthy_person/**/*.csv`) and `stroke_patient` (`stroke_patient/**/*.csv`, one folder per patient); `public` in the feature builder means both.
+- Each file is split into segments at gaps over 1 s or backwards timestamps, giving 157 segments (143 healthy, 14 patient); each segment is one trial, so windows never cross a gap.
 - Every row carries `fs` = 100, which the feature builder, replay and fine-tuning use for window sizes.
 
 ```bash

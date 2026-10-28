@@ -23,7 +23,7 @@ Phase B adds LoRA adapters to the encoder attention (q, v) and trains them with
 the head. Splits come from results/splits.json, written by src.models.train_emg,
 so MOMENT and the LDA/SVM/RF baseline are scored on the same held-out subjects.
 """
-import argparse, json, time
+import argparse, json, os, time
 import numpy as np, pandas as pd
 from src.utils.config import ROOT
 
@@ -250,7 +250,6 @@ def main(argv=None):
         extra, shared = load_public(args.extra_data, labels, args.max_extra)
         print(f"Extra training data: {len(extra['y'])} public windows ({', '.join(shared)}) added to every training fold")
     lora_state = pretrain(args, device, loader, run_dir) if args.pretrain_data else None
-    every_synthetic = np.ones(len(synthetic["y"]), bool)
     rows, epochs, all_true, all_pred = [], [], [], []
     for test in test_sets:
         fold = "+".join(test)
@@ -277,9 +276,10 @@ def main(argv=None):
         epochs += [{"fold": fold, "phase": "lora", **h} for h in history]
         lora = predict(model, loader(data, test_mask, False), device); true = data["y"][test_mask]
         results = [("linear_probe", fold, true, probe), ("lora", fold, true, lora)]
-        if len(synthetic["y"]):
-            patient = "+".join(sorted(set(synthetic["subject"])))
-            results.append(("lora", f"{patient} (stroke patient)", synthetic["y"], predict(model, loader(synthetic, every_synthetic, False), device)))
+        # Each stroke patient is scored on their own (never trained on).
+        for patient in sorted(set(synthetic["subject"])):
+            mine = synthetic["subject"] == patient
+            results.append(("lora", f"{patient} (stroke patient)", synthetic["y"][mine], predict(model, loader(synthetic, mine, False), device)))
         for phase, tested, y_true, pred in results:
             rows.append({"model": f"MOMENT-1-{args.size}", "phase": phase, "split": args.split, "fold": fold, "test": tested,
                          "accuracy": accuracy_score(y_true, pred), "macro_f1": f1_score(y_true, pred, average="macro"), "n_test": len(y_true),
@@ -383,9 +383,12 @@ def finish_run(run_dir, metrics, summary):
               "Use it: `python -m src.models.moment_predict --adapter " + f"models/moment/{info['run_id']}/folds/{info['folds'][-1]} <csv files>`"]
     (run_dir / "README.md").write_text("\n".join(lines) + "\n")
     index = RUNS_DIR / "runs.csv"
+    public = {k: os.path.basename(info["args"].get(k) or "") for k in ("pretrain_data", "extra_data")}
     row = pd.DataFrame([{"run_id": info["run_id"], "created": info["created"], "size": info["size"], "split": info["split"],
-                         "revin": info["revin"], "folds": len(info["folds"]),
+                         "revin": info["revin"], "folds": len(info["folds"]), **public,
                          **{f"{k}_accuracy": v["accuracy"] for k, v in info["results"].items()}}])
+    # Keep the existing column order so appended rows line up with the header.
+    if index.exists(): row = row.reindex(columns=pd.read_csv(index, nrows=0).columns)
     row.to_csv(index, mode="a", header=not index.exists(), index=False)
 
 

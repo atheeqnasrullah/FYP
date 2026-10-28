@@ -1,6 +1,6 @@
 # Fine-tuning stage: MOMENT-1
 
-**Status (2026-10-21): done, corrected.** MOMENT-1-small fine-tuned with LoRA reaches 45.9% leave-one-subject-out on our 8 volunteers (48.7% on the S07-S09 holdout), 2.9 points above training the head alone. It does not overtake frozen MOMENT features + random forest (48.1%), and pre-training on public EMG data did not help; full comparison in [model_comparison.md](model_comparison.md).
+**Status (2026-10-28): done on all current data.** MOMENT-1-small was fine-tuned again from the pinned base model on all 19 usable volunteers (S02-S20), with freshly built windows; nothing from earlier runs was reused. LoRA reaches 68.2% leave-one-subject-out (82.2% on the S18-S20 holdout), 2.6 points above training the head alone, and 57.5% on the two stroke patients. It does not overtake frozen MOMENT features + random forest (72.1%); full comparison in [model_comparison.md](model_comparison.md). The earlier 8-volunteer runs (45.9% LOSO) are kept for reference.
 
 > **Correction (2026-10-21).** Runs before this date did not fine-tune the encoder: MOMENT enables gradient checkpointing by default, and with a frozen encoder that blocks every gradient to the LoRA adapters, so only the head trained. `build_model` now passes `enable_gradient_checkpointing: False`, the smoke test fails if the adapters do not move after one step, and all runs were repeated. The invalid runs were removed from `models/moment/`.
 
@@ -39,15 +39,15 @@
 | `manifest.csv` | One row per window with the same fields |
 | `metadata.json` | Parameters, label order, counts per subject and movement, calibration statistics, class weights, excluded subjects |
 
-**Result (2026-10-18):** 2,795 windows from 66 segments, none padded or dropped.
+**Result (2026-10-28):** 6,407 windows from 150 segments, none padded or dropped. The earlier 2,795-window set is kept in `data/processed/moment_old_20261018/`.
 
 | Subject | Rest | Hand_Open | Hand_Close | Left | Right | Up | Down |
 |---|---|---|---|---|---|---|---|
-| S02, S03, S05-S09 (each) | 43 | 43 | 43 | 43 | 43 | 43 | 43 |
+| S02, S03, S05-S20 (each) | 43 | 43 | 43 | 43 | 43 | 43 | 43 |
 | S04 | 43 | 86 | 86 | 43 | 43 | 86 | 0 |
-| SP01 (stroke patient, test only) | 43 | 43 | 43 | 43 | 43 | 43 | 43 |
+| SP02, SP03 (stroke patients, test only, each) | 43 | 43 | 43 | 43 | 43 | 43 | 43 |
 
-That is 2,494 healthy windows for training and testing, and 301 stroke-patient windows used only as an extra test (at the time of the runs below these came from the generated patient `SYN_STROKE_01`, now replaced by `SP01`). Classes are nearly balanced (class weights 0.92-1.18); `--class-weights` applies them to the loss.
+That is 5,805 healthy windows for training and testing, and 602 stroke-patient windows used only as an extra test; each patient is scored on their own. Classes are nearly balanced; `--class-weights` applies class weights to the loss.
 
 Options: `--step` (default 128), `--min-samples` (256), `--max-interp` (0.25), `--out`.
 
@@ -57,16 +57,18 @@ Splits come from `results/splits.json`, written by the baseline with S01 exclude
 
 | Split | Train | Validation (early stopping) | Test |
 |---|---|---|---|
-| `holdout` | S02-S05 | S06 | S07, S08, S09: 903 windows, 129 per movement |
-| `loso` | All but two subjects | The last remaining training subject | One subject per fold, 8 folds |
+| `holdout` | S02-S16 | S17 | S18, S19, S20: 903 windows, 129 per movement |
+| `loso` | All but two subjects | The last remaining training subject | One subject per fold, 19 folds |
 
-**Baseline to beat (same 8 subjects, S01 excluded, `results/tables/baseline_finetune_subjects_metrics.csv`):**
+The 8-volunteer splits used before 2026-10-28 are kept in `results/splits_old_20261021.json`.
 
-| Model | Leave-one-subject-out | Within-subject | Synthetic patient `SYN_STROKE_01` (earlier file) |
+**Baseline to beat (same 19 subjects, S01 excluded, `results/tables/baseline_finetune_subjects_metrics.csv`):**
+
+| Model | Leave-one-subject-out | Within-subject | Stroke patients `SP02` + `SP03` |
 |---|---|---|---|
-| LDA | 34.7% | 36.9% | 26.5% |
-| SVM | **37.4%** (macro F1 0.330) | **39.2%** | 25.5% |
-| Random forest | 34.6% | 35.8% | **36.7%** |
+| LDA | 40.8% | 41.2% | 23.3% |
+| SVM | **43.8%** (macro F1 0.419) | **44.7%** | 30.7% |
+| Random forest | 41.6% | 42.1% | **31.6%** |
 
 The baseline classifies 200 ms windows from 8 features; MOMENT sees 5.12 s of raw envelope per decision, so it has more context. Report both window lengths when comparing.
 
@@ -118,7 +120,26 @@ uv pip install --python .venv-finetune/bin/python -r requirements-finetune.txt
 
 Verified before training: a model saved in this layout and reloaded gives identical outputs (maximum difference 0.0), and `moment_predict` reproduces the training calibration for S07 (mean 2.853).
 
-## Results (2026-10-21)
+## Results (2026-10-28, 19 volunteers)
+
+MOMENT-1-small, no RevIN, trained from the pinned base on the rebuilt windows, same splits as the classical models; times on an M3 Pro GPU. Chance is 14.3%.
+
+| Run folder | Split | Head only (Phase A) | LoRA (Phase B) | `SP02` | `SP03` | Time |
+|---|---|---|---|---|---|---|
+| `small_holdout_newdata_20261027-230705` | holdout (test S18-S20) | 74.9% | **82.2%** | 48.5% | 64.8% | 4 min |
+| `small_loso_newdata_20261027-231047` | loso, 19 folds | 65.7% | **68.2%** | 51.6% | 63.5% | 6.5 h (about 1.5 h awake; the laptop slept during folds S07-S09) |
+
+LoRA LOSO accuracy is 44.4% on the original volunteers S02-S09 and 85.6% on the new S10-S20; per-volunteer values are in [model_comparison.md](model_comparison.md#per-volunteer-loso-accuracy). LoRA per movement (LOSO recall): Rest 85%, Hand_Open 85%, Hand_Close 80%, Left 66%, Right 49%, Up 37%, Down 74%.
+
+What the results show:
+
+- **LoRA fine-tuning works:** +2.6 points over the head alone (LOSO) and +7.3 on the holdout.
+- **More volunteers helped a lot:** 68.2% LOSO against 45.9% with 8 volunteers, mostly because the new volunteers are easier; on S02-S09 it is 44.4%, about the same as before.
+- **It is still not the best model:** frozen MOMENT features + random forest reach 72.1% LOSO, and an SVM on 5.12 s window features 71.7%.
+
+For a single model to use, take the holdout adapter (`small_holdout_newdata_20261027-230705/folds/S18+S19+S20`, trained on 15 volunteers) or any LOSO fold (17 volunteers).
+
+## Results (2026-10-21, 8 volunteers)
 
 All runs: MOMENT-1-small, no RevIN, 8 volunteers, same splits as the classical models; times on an M3 Pro GPU. Chance is 14.3%.
 
@@ -138,7 +159,7 @@ What the results show:
 - **It is not the best model:** frozen MOMENT features + random forest reach 48.1% LOSO, and an SVM on 5.12 s window features 47.3%.
 - **Public data did not help our volunteers:** every public-data run is 0.5-1.3 points below own-data fine-tuning. Pre-training learned the public data (EMG-EPN-612: 53.7% on held-out public people) but transferred poorly to the MD0437 signal. It did help the stroke patient (`SP01`: 55.4% vs 49.4%).
 
-Pre-trained runs keep the public-data adapter in `pretrain/`. For a single model to use, take the holdout adapter (`small_holdout_20261021-191854/folds/S07+S08+S09`) or any LOSO fold; each was trained on 4 or 6 volunteers.
+Pre-trained runs keep the public-data adapter in `pretrain/`. The public-data runs have not been repeated on 19 volunteers.
 
 ## Commands
 
@@ -149,7 +170,7 @@ From `FYP/`:
 .venv-finetune/bin/python -m src.models.finetune_moment --check-data       # 2. windows and folds
 .venv-finetune/bin/python -m src.models.finetune_moment --smoke            # 3. one step per phase, saves nothing
 .venv-finetune/bin/python -m src.models.finetune_moment --split holdout    # 4. first real run
-.venv-finetune/bin/python -m src.models.finetune_moment --split loso       # 5. final comparison (8 folds)
+.venv-finetune/bin/python -m src.models.finetune_moment --split loso       # 5. final comparison (19 folds)
 .venv-finetune/bin/python -m src.models.moment_predict --adapter models/moment/<run>/folds/<fold> <csv files>   # 6. use it
 ```
 

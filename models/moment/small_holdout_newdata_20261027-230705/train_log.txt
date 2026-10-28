@@ -1,0 +1,32 @@
+Fold test=['S18', 'S19', 'S20'] val=S17 train=['S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09', 'S10', 'S11', 'S12', 'S13', 'S14', 'S15', 'S16'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.651
+  epoch 2: val accuracy 0.645
+  epoch 3: val accuracy 0.691
+  epoch 4: val accuracy 0.738
+  epoch 5: val accuracy 0.721
+  epoch 6: val accuracy 0.714
+  epoch 7: val accuracy 0.771
+  epoch 8: val accuracy 0.751
+  epoch 9: val accuracy 0.721
+  epoch 10: val accuracy 0.761
+  epoch 11: val accuracy 0.748
+ Phase B: LoRA
+  epoch 1: val accuracy 0.791
+  epoch 2: val accuracy 0.824
+  epoch 3: val accuracy 0.834
+  epoch 4: val accuracy 0.831
+  epoch 5: val accuracy 0.837
+  epoch 6: val accuracy 0.804
+  epoch 7: val accuracy 0.804
+  epoch 8: val accuracy 0.794
+  epoch 9: val accuracy 0.811
+  linear_probe on S18+S19+S20: accuracy 0.749
+  lora on S18+S19+S20: accuracy 0.822
+  lora on SP02 (stroke patient): accuracy 0.485
+  lora on SP03 (stroke patient): accuracy 0.648
+                             accuracy  macro_f1
+phase        test                              
+linear_probe healthy           0.7486    0.7094
+lora         healthy           0.8217    0.8157
+             stroke patient    0.5664    0.5323

@@ -5,10 +5,12 @@ timestamp_ms, adc_value, subject_id, movement_label, sampled at 100 Hz.
 adc_value is the raw 12-bit ESP32 reading (0-4095) of the MD0437 envelope.
 
 Sources:
-  healthy           Dataset/Healthy_person/S01-S09 (9 volunteers)
-  stroke_patient    Dataset/stroke_patient (one stroke patient, SP01; replaced
-                    the generated patient SYN_STROKE_01 on 2026-10-18); never
-                    mixed into healthy training, only used as an extra test
+  healthy           Dataset/Healthy_person/<subject>/ (S01-S20, 20 volunteers)
+  stroke_patient    Dataset/stroke_patient/<patient>/ (SP01, SP02; SP01
+                    replaced the generated patient SYN_STROKE_01 on 2026-10-18);
+                    never mixed into healthy training, only used as an extra test
+
+Files may sit directly in the cohort folder or in one folder per subject.
 
 Some files join several recordings (gaps of 12-760 s, one timestamp that runs
 backwards), so a file is split into segments at any backwards step or gap
@@ -27,8 +29,8 @@ STEP_MS = 1000 // FS
 MAX_GAP_MS = 1000  # longer steps (or backwards ones) start a new segment
 GESTURES = ["Rest", "Hand_Open", "Hand_Close", "Left", "Right", "Up", "Down"]
 SOURCES = {
-    "healthy": {"glob": "Healthy_person/*/*.csv", "cohort": "healthy"},
-    "stroke_patient": {"glob": "stroke_patient/*.csv", "cohort": "stroke_patient"},
+    "healthy": {"glob": "Healthy_person/**/*.csv", "cohort": "healthy"},
+    "stroke_patient": {"glob": "stroke_patient/**/*.csv", "cohort": "stroke_patient"},
 }
 
 

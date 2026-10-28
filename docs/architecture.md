@@ -224,7 +224,7 @@ FYP/
 ├── backend/                  app.py (session API, SQLite), webapi.py (web app API)
 ├── webapp/                   RehabHub: React 19 + TypeScript + Vite
 ├── dashboard/                dashboard.py (Streamlit, older)
-├── Dataset/                  Healthy_person/S01-S09, stroke_patient/SP01, public/ (downloaded, not in git)
+├── Dataset/                  Healthy_person/S01-S20, stroke_patient/SP01-SP02, public/ (downloaded, not in git)
 ├── data/                     models/ (MediaPipe), raw/, features/, logs/
 ├── models/moment/            committed fine-tuning runs (LoRA adapters, metrics, logs)
 ├── results/                  tables/, figures/, splits.json

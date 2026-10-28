@@ -18,7 +18,9 @@
 | Within-subject (first 70% of each recording train, last 30% test, 2-window gap) | 37.5% | 0.331 |
 | Train healthy, test synthetic stroke patient `SYN_STROKE_01` (earlier file, now replaced by `SP01`) | 25.4% | 0.201 |
 
-Recall across subjects: Rest 81%, Hand_Close 65%, Hand_Open 46%, Left 21%, Down 18%, Up 15%, Right 7%.
+Re-evaluated on 2026-10-28 with the 19 current volunteers (S02-S20, S01 excluded; the saved file was not retrained): SVM 43.8% leave-one-subject-out (macro F1 0.419), 44.7% within-subject, 30.7% on the stroke patients `SP02` and `SP03`.
+
+Recall across subjects (2026-10-18): Rest 81%, Hand_Close 65%, Hand_Open 46%, Left 21%, Down 18%, Up 15%, Right 7%.
 
 ## Limitations
 

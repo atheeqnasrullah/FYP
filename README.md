@@ -38,19 +38,19 @@ If port 8000 is taken, use another port and set `backend_url` in `config/setting
 | EMG | MD0437 envelope at 1 kHz over USB serial; RMS/MAV activity shown and logged (not strength) | [hardware.md](docs/hardware.md) |
 | Web app (RehabHub) | Dashboard, patients, sessions, game launcher, EMG dataset explorer, settings | [web_app.md](docs/web_app.md) |
 | API | FastAPI + SQLite, 33 endpoints, local only (no authentication) | [api_reference.md](docs/api_reference.md) |
-| Data | `Dataset/`: 9 healthy volunteers and 1 stroke patient, 7 movements, 100 Hz | [datasets.md](docs/datasets.md) |
+| Data | `Dataset/`: 20 healthy volunteers and 2 stroke patients, 7 movements, 100 Hz | [datasets.md](docs/datasets.md) |
 | EMG classifiers (offline research) | LDA, SVM, random forest and MOMENT-1 (fine-tuned models in `models/moment/`) | [model_comparison.md](docs/model_comparison.md) |
 
-## Key results (offline, 8 healthy volunteers, 7 movements, chance 14.3%)
+## Key results (offline, 19 healthy volunteers, 7 movements, chance 14.3%; 2026-10-28)
 
-| Method | Leave-one-subject-out accuracy |
-|---|---|
-| Frozen MOMENT-1 features + random forest | **48.1%** |
-| SVM on 5.12 s window features | 47.3% |
-| MOMENT-1-small fine-tuned (LoRA) | 45.9% (48.7% on the S07-S09 holdout) |
-| SVM on 200 ms window features | 37.2% |
+| Method | Leave-one-subject-out accuracy | S02-S09 / S10-S20 | Stroke patients `SP02` + `SP03` |
+|---|---|---|---|
+| Frozen MOMENT-1 features + random forest | **72.1%** | 47.9% / 89.6% | 55.4% (68.7% with RevIN) |
+| SVM on 5.12 s window features | 71.7% | 48.7% / 88.5% | 42.1% |
+| MOMENT-1-small fine-tuned (LoRA) | 68.2% (82.2% on the S18-S20 holdout) | 44.4% / 85.6% | 57.5% |
+| SVM on 200 ms window features | 43.8% | 35.4% / 49.9% | 29.2% |
 
-Rest, Hand_Open and Hand_Close are recognised well from EMG; Left, Right, Up and Down are near chance with one forearm channel, so the camera keeps control of movement. Public data (UCI, 36 people; EMG-EPN-612, 612 people) did not improve accuracy on our volunteers. See [docs/model_comparison.md](docs/model_comparison.md).
+The 11 new volunteers (S10-S20) are much easier to classify than the first eight, so the per-group columns matter more than the overall mean. Rest, Hand_Open and Hand_Close are recognised best from EMG; directions are partly learnable on 5.12 s windows but less reliable, so the camera keeps control of movement. Public data (UCI, 36 people; EMG-EPN-612, 612 people), tested on the earlier 8 volunteers, did not improve accuracy. See [docs/model_comparison.md](docs/model_comparison.md).
 
 ## Repository map
 
