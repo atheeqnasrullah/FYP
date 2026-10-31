@@ -81,22 +81,26 @@ For fine-tuning, `python -m src.data.prepare_finetune` turns this folder into mo
 
 ## Public data
 
-To test whether outside data improves accuracy, two public datasets were downloaded and converted. They are not committed (see `.gitignore`); anyone can fetch them with `python -m src.data.download_public uci_gestures epn612` (large files use 8 parallel connections, resume after interruptions and are checked against the published MD5).
+To test whether outside data improves accuracy, three public datasets were downloaded and converted. They are not committed (see `.gitignore`); anyone can fetch them with `python -m src.data.download_public uci_gestures epn612 ninapro_db1` (large files use 8 parallel connections, resume after interruptions and are checked against the published MD5).
 
-| Item | UCI EMG Data for Gestures | EMG-EPN-612 |
-|---|---|---|
-| Source | [archive.ics.uci.edu/dataset/481](https://archive.ics.uci.edu/dataset/481/emg+data+for+gestures) (Lobov et al., *Sensors* 2018) | [doi.org/10.5281/zenodo.4421500](https://doi.org/10.5281/zenodo.4421500) (v2.1, Escuela Politécnica Nacional) |
-| Licence | CC BY 4.0 | CC BY 4.0 |
-| Folder, size | `Dataset/public/uci_gestures/`, 17 MB | `Dataset/public/epn612/`, 5.5 GB zip, 11 GB unpacked |
-| People | 36 healthy | 612 healthy (306 + 306) |
-| Recording | 8-channel Myo armband, about 1 kHz; 2 series x 6-7 gestures of about 1.8 s | 8-channel Myo armband, 200 Hz; 150-300 labelled 5 s recordings per person (25 per gesture), gesture about 1 s inside |
-| Labels | Rest, fist (= Hand_Close), extended palm (= Hand_Open, only a few people), wrist flexion, wrist extension, radial deviation, ulnar deviation | noGesture (= Rest), fist (= Hand_Close), open (= Hand_Open), waveIn (wrist flexion), waveOut (wrist extension), pinch |
-| Conversion | `python -m src.data.public_emg uci_gestures`: all 8 channels | `python -m src.data.public_emg epn612`: one random channel per recording, full 5 s |
-| Output | `data/processed/public/uci_gestures_windows.npz`: 6,288 windows; 2,120 share our labels | `data/processed/public/epn612_windows.npz`: 137,700 windows (22,950 per gesture); 68,850 share our labels |
+**EMG-EPN-612 data deleted (2026-10-31).** The 5.5 GB download (16 GB on disk with the converted windows) was removed: it transferred poorly and no current model uses it. Every model trained since 2026-10-27 starts from the pinned MOMENT base, so removing it changes no result. The 2026-10-21 EPN runs stay in `models/moment/` as a documented negative result, and the data can be fetched again with the command above.
 
-Conversion, for both: each armband channel is rectified, smoothed (100 ms moving RMS), resampled to 100 Hz and scaled to our ADC range, then windowed like `Dataset/` (log1p, per-recording-channel calibration, 512-sample windows; short recordings padded and masked). The wrist movements keep their own names, because it is not known how they relate to our Left/Right/Up/Down.
+| Item | UCI EMG Data for Gestures | EMG-EPN-612 (data deleted) | NinaPro DB1 |
+|---|---|---|---|
+| Source | [archive.ics.uci.edu/dataset/481](https://archive.ics.uci.edu/dataset/481/emg+data+for+gestures) (Lobov et al., *Sensors* 2018) | [doi.org/10.5281/zenodo.4421500](https://doi.org/10.5281/zenodo.4421500) (v2.1, Escuela Politécnica Nacional) | [ninapro.hevs.ch/instructions/DB1.html](https://ninapro.hevs.ch/instructions/DB1.html) (Atzori et al., *Scientific Data* 2014) |
+| Licence | CC BY 4.0 | CC BY 4.0 | Free for research; cite the NinaPro papers |
+| Folder, size | `Dataset/public/uci_gestures/`, 17 MB | was `Dataset/public/epn612/`, 5.5 GB zip, 11 GB unpacked | `Dataset/public/ninapro_db1/`, 27 zips of about 20 MB, 1.2 GB with the unpacked `.mat` files |
+| People | 36 healthy | 612 healthy (306 + 306) | 27 healthy (25 right-handed) |
+| Recording | 8-channel Myo armband, about 1 kHz; 2 series x 6-7 gestures of about 1.8 s | 8-channel Myo armband, 200 Hz; 150-300 labelled 5 s recordings per person (25 per gesture), gesture about 1 s inside | 10 Otto Bock electrodes that output an RMS envelope at 100 Hz (8 around the forearm, 2 on finger flexor and extensor); 10 repetitions of about 3 s, 5 s rest between |
+| Labels | Rest, fist (= Hand_Close), extended palm (= Hand_Open, only a few people), wrist flexion, wrist extension, radial deviation, ulnar deviation | noGesture (= Rest), fist (= Hand_Close), open (= Hand_Open), waveIn (wrist flexion), waveOut (wrist extension), pinch | Exercise B (`S<n>_A1_E2.mat`, `restimulus`): 0 Rest, 5 abduction of all fingers (= Hand_Open), 6 fist (= Hand_Close), 13 wrist flexion, 14 wrist extension, 15 radial deviation, 16 ulnar deviation; the other 11 movements are not used |
+| Conversion | `python -m src.data.public_emg uci_gestures`: all 8 channels | `python -m src.data.public_emg epn612`: one random channel per recording, full 5 s | `python -m src.data.public_emg ninapro_db1 [--db1-mapping none\|direct\|mirrored]`: all 10 electrodes, envelope used as recorded |
+| Output | `data/processed/public/uci_gestures_windows.npz`: 6,288 windows; 2,120 share our labels | `epn612_windows.npz`: 137,700 windows (22,950 per gesture); 68,850 share our labels | `ninapro_db1[_direct\|_mirrored]_windows.npz`: 18,960 windows (2,700 per movement, 2,760 Rest) |
 
-How much the public data helped: [model_comparison.md](model_comparison.md#public-data-uci-and-emg-epn-612). In short, it did not improve accuracy on our volunteers.
+Conversion, UCI and EMG-EPN-612: each armband channel is rectified, smoothed (100 ms moving RMS), resampled to 100 Hz and scaled to our ADC range, then windowed like `Dataset/` (log1p, per-recording-channel calibration, 512-sample windows; short recordings padded and masked). The wrist movements keep their own names, because it is not known how they relate to our Left/Right/Up/Down.
+
+Conversion, NinaPro DB1: the electrodes already give a 100 Hz envelope like the MD0437, so rectifying and smoothing are skipped; each electrode is scaled to our ADC range and windowed the same way. Rest is thinned to 10 pauses per person, so it does not outnumber the movements. Activity per movement has the same shape as ours (median scaled envelope: Hand_Close 404, wrist movements 314-361, Hand_Open 238, Rest 11). The wrist movements keep their names by default (`none`). `direct` renames them as a right hand, palm down: Up = extension, Down = flexion, Left = radial deviation, Right = ulnar deviation. `mirrored` swaps Left and Right.
+
+How much the public data helped: [model_comparison.md](model_comparison.md#public-data-uci-and-emg-epn-612) and [NinaPro DB1](model_comparison.md#public-data-ninapro-db1). In short, UCI and EMG-EPN-612 did not improve accuracy on our volunteers; NinaPro DB1 is the best match for our sensor (see that section for its result).
 
 ## Your own recordings
 

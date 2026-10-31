@@ -2,6 +2,8 @@
 
 **Status (2026-10-28): done on all current data.** MOMENT-1-small was fine-tuned again from the pinned base model on all 19 usable volunteers (S02-S20), with freshly built windows; nothing from earlier runs was reused. LoRA reaches 68.2% leave-one-subject-out (82.2% on the S18-S20 holdout), 2.6 points above training the head alone, and 57.5% on the two stroke patients. It does not overtake frozen MOMENT features + random forest (72.1%); full comparison in [model_comparison.md](model_comparison.md). The earlier 8-volunteer runs (45.9% LOSO) are kept for reference.
 
+**Update (2026-10-31): NinaPro DB1 pre-training.** Pre-training the LoRA adapters on NinaPro DB1 (an envelope at 100 Hz, like the MD0437) before fine-tuning raises LOSO accuracy to **70.0%** (+1.8 points; S02-S09 +3.1) and the stroke patients to 59.3%. The holdout rises to 85.7%. The EMG-EPN-612 data used earlier was deleted. No current model was trained on it: every run since 2026-10-27, including the DB1 runs, starts from the pinned base model. Details: [model_comparison.md](model_comparison.md#public-data-ninapro-db1).
+
 > **Correction (2026-10-21).** Runs before this date did not fine-tune the encoder: MOMENT enables gradient checkpointing by default, and with a frozen encoder that blocks every gradient to the LoRA adapters, so only the head trained. `build_model` now passes `enable_gradient_checkpointing: False`, the smoke test fails if the adapters do not move after one step, and all runs were repeated. The invalid runs were removed from `models/moment/`.
 
 ## Why MOMENT-1
@@ -139,6 +141,19 @@ What the results show:
 
 For a single model to use, take the holdout adapter (`small_holdout_newdata_20261027-230705/folds/S18+S19+S20`, trained on 15 volunteers) or any LOSO fold (17 volunteers).
 
+## Results (2026-10-31, NinaPro DB1 pre-training, 19 volunteers)
+
+Same base, windows and splits as the 2026-10-28 runs; the adapters first learn DB1 Exercise B (18,960 windows, 27 people, 7 movements with their own names; 10 epochs, 54.8% on 3 held-out DB1 people), then are fine-tuned on our data with a new head.
+
+| Run folder | Split | Training data | Head only (Phase A) | LoRA (Phase B) | `SP02` | `SP03` | Time |
+|---|---|---|---|---|---|---|---|
+| `small_holdout_db1_pretrain_20261031-202258` | holdout | Pre-trained on DB1 | 77.1% | **85.7%** | 47.2% | 66.8% | 15 min |
+| `small_holdout_db1_direct_20261031-203818` | holdout | Own + 4,200 DB1 windows, directions mapped directly | 75.2% | 81.8% | 46.8% | 66.4% | 7 min |
+| `small_holdout_db1_mirrored_20261031-204535` | holdout | Own + 4,200 DB1 windows, Left/Right mirrored | 77.0% | 82.9% | 42.2% | 67.1% | 7 min |
+| `small_loso_db1_pretrain_20261031-205339` | loso, 19 folds | Pre-trained on DB1 | 65.4% | **70.0%** | 50.6% | 68.0% | 2 h |
+
+For a single model to use, take the DB1-pre-trained holdout adapter (`small_holdout_db1_pretrain_20261031-202258/folds/S18+S19+S20`); its `pretrain/` folder holds the DB1 adapter on its own.
+
 ## Results (2026-10-21, 8 volunteers)
 
 All runs: MOMENT-1-small, no RevIN, 8 volunteers, same splits as the classical models; times on an M3 Pro GPU. Chance is 14.3%.
@@ -171,6 +186,7 @@ From `FYP/`:
 .venv-finetune/bin/python -m src.models.finetune_moment --smoke            # 3. one step per phase, saves nothing
 .venv-finetune/bin/python -m src.models.finetune_moment --split holdout    # 4. first real run
 .venv-finetune/bin/python -m src.models.finetune_moment --split loso       # 5. final comparison (19 folds)
+.venv-finetune/bin/python -m src.models.finetune_moment --split loso --pretrain-data data/processed/public/ninapro_db1_windows.npz --tag db1_pretrain   # 5b. best: DB1 pre-training first
 .venv-finetune/bin/python -m src.models.moment_predict --adapter models/moment/<run>/folds/<fold> <csv files>   # 6. use it
 ```
 

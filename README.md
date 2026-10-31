@@ -47,10 +47,11 @@ If port 8000 is taken, use another port and set `backend_url` in `config/setting
 |---|---|---|---|
 | Frozen MOMENT-1 features + random forest | **72.1%** | 47.9% / 89.6% | 55.4% (68.7% with RevIN) |
 | SVM on 5.12 s window features | 71.7% | 48.7% / 88.5% | 42.1% |
-| MOMENT-1-small fine-tuned (LoRA) | 68.2% (82.2% on the S18-S20 holdout) | 44.4% / 85.6% | 57.5% |
+| MOMENT-1-small, LoRA, pre-trained on NinaPro DB1 (2026-10-31) | 70.0% (85.7% on the S18-S20 holdout) | 47.5% / 86.4% | 59.3% |
+| MOMENT-1-small fine-tuned (LoRA), own data only | 68.2% (82.2% on the S18-S20 holdout) | 44.4% / 85.6% | 57.5% |
 | SVM on 200 ms window features | 43.8% | 35.4% / 49.9% | 29.2% |
 
-The 11 new volunteers (S10-S20) are much easier to classify than the first eight, so the per-group columns matter more than the overall mean. Rest, Hand_Open and Hand_Close are recognised best from EMG; directions are partly learnable on 5.12 s windows but less reliable, so the camera keeps control of movement. Public data (UCI, 36 people; EMG-EPN-612, 612 people), tested on the earlier 8 volunteers, did not improve accuracy. See [docs/model_comparison.md](docs/model_comparison.md).
+The 11 new volunteers (S10-S20) are much easier to classify than the first eight, so the per-group columns matter more than the overall mean. Rest, Hand_Open and Hand_Close are recognised best from EMG; directions are partly learnable on 5.12 s windows but less reliable, so the camera keeps control of movement. Public armband data (UCI, 36 people; EMG-EPN-612, 612 people, now deleted) did not improve accuracy; pre-training on NinaPro DB1 (27 people, an envelope like our sensor's) adds 1.8 points. See [docs/model_comparison.md](docs/model_comparison.md).
 
 ## Repository map
 
@@ -72,4 +73,4 @@ docs/              documentation                 tests/      62 pytest tests
 
 ## Credits
 
-Public data: UCI "EMG Data for Gestures" (Lobov et al., *Sensors* 2018) and EMG-EPN-612 (Escuela Politécnica Nacional, Zenodo 10.5281/zenodo.4421500), both CC BY 4.0. Base model: [AutonLab/MOMENT-1-small](https://huggingface.co/AutonLab/MOMENT-1-small), MIT licence. Team: M.N.M. Atheeq, A.F.M. Imzaan; supervisors Ms. Dulashi Pabasara and Mr. Vihanga Herath.
+Public data: UCI "EMG Data for Gestures" (Lobov et al., *Sensors* 2018) and EMG-EPN-612 (Escuela Politécnica Nacional, Zenodo 10.5281/zenodo.4421500), both CC BY 4.0; NinaPro DB1 (Atzori et al., *Scientific Data* 2014, ninapro.hevs.ch). Base model: [AutonLab/MOMENT-1-small](https://huggingface.co/AutonLab/MOMENT-1-small), MIT licence. Team: M.N.M. Atheeq, A.F.M. Imzaan; supervisors Ms. Dulashi Pabasara and Mr. Vihanga Herath.

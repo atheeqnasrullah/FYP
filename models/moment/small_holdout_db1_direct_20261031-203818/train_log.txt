@@ -1,0 +1,32 @@
+Extra training data: 4200 public windows (Rest, Hand_Open, Hand_Close, Left, Right, Up, Down) added to every training fold
+Fold test=['S18', 'S19', 'S20'] val=S17 train=['S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09', 'S10', 'S11', 'S12', 'S13', 'S14', 'S15', 'S16'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.568
+  epoch 2: val accuracy 0.654
+  epoch 3: val accuracy 0.728
+  epoch 4: val accuracy 0.748
+  epoch 5: val accuracy 0.767
+  epoch 6: val accuracy 0.701
+  epoch 7: val accuracy 0.754
+  epoch 8: val accuracy 0.728
+  epoch 9: val accuracy 0.757
+ Phase B: LoRA
+  epoch 1: val accuracy 0.834
+  epoch 2: val accuracy 0.844
+  epoch 3: val accuracy 0.841
+  epoch 4: val accuracy 0.827
+  epoch 5: val accuracy 0.850
+  epoch 6: val accuracy 0.900
+  epoch 7: val accuracy 0.894
+  epoch 8: val accuracy 0.854
+  epoch 9: val accuracy 0.894
+  epoch 10: val accuracy 0.894
+  linear_probe on S18+S19+S20: accuracy 0.752
+  lora on S18+S19+S20: accuracy 0.818
+  lora on SP02 (stroke patient): accuracy 0.468
+  lora on SP03 (stroke patient): accuracy 0.664
+                             accuracy  macro_f1
+phase        test                              
+linear_probe healthy           0.7519    0.7478
+lora         healthy           0.8184    0.8088
+             stroke patient    0.5664    0.5209

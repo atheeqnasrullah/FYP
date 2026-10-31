@@ -1,0 +1,49 @@
+Pre-training on 18960 public windows, 7 labels ['Rest', 'Hand_Open', 'Hand_Close', 'Radial_Deviation', 'Ulnar_Deviation', 'Wrist_Extension', 'Wrist_Flexion']; validation subjects ['DB1_S7', 'DB1_S8', 'DB1_S9']
+  epoch 1: val accuracy 0.463
+  epoch 2: val accuracy 0.478
+  epoch 3: val accuracy 0.521
+  epoch 4: val accuracy 0.526
+  epoch 5: val accuracy 0.510
+  epoch 6: val accuracy 0.520
+  epoch 7: val accuracy 0.535
+  epoch 8: val accuracy 0.548
+  epoch 9: val accuracy 0.539
+  epoch 10: val accuracy 0.548
+ pre-training best validation accuracy 0.548
+Fold test=['S18', 'S19', 'S20'] val=S17 train=['S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09', 'S10', 'S11', 'S12', 'S13', 'S14', 'S15', 'S16'] on mps
+ Phase A: linear probe
+  epoch 1: val accuracy 0.631
+  epoch 2: val accuracy 0.764
+  epoch 3: val accuracy 0.764
+  epoch 4: val accuracy 0.774
+  epoch 5: val accuracy 0.781
+  epoch 6: val accuracy 0.794
+  epoch 7: val accuracy 0.784
+  epoch 8: val accuracy 0.807
+  epoch 9: val accuracy 0.791
+  epoch 10: val accuracy 0.757
+  epoch 11: val accuracy 0.781
+  epoch 12: val accuracy 0.811
+  epoch 13: val accuracy 0.777
+  epoch 14: val accuracy 0.797
+  epoch 15: val accuracy 0.771
+ Phase B: LoRA
+  epoch 1: val accuracy 0.821
+  epoch 2: val accuracy 0.794
+  epoch 3: val accuracy 0.827
+  epoch 4: val accuracy 0.854
+  epoch 5: val accuracy 0.877
+  epoch 6: val accuracy 0.904
+  epoch 7: val accuracy 0.894
+  epoch 8: val accuracy 0.887
+  epoch 9: val accuracy 0.894
+  epoch 10: val accuracy 0.880
+  linear_probe on S18+S19+S20: accuracy 0.771
+  lora on S18+S19+S20: accuracy 0.857
+  lora on SP02 (stroke patient): accuracy 0.472
+  lora on SP03 (stroke patient): accuracy 0.668
+                             accuracy  macro_f1
+phase        test                              
+linear_probe healthy           0.7708    0.7649
+lora         healthy           0.8571    0.8499
+             stroke patient    0.5698    0.5221

@@ -1,6 +1,6 @@
 # Model comparison: classical models, MOMENT-1 before and after fine-tuning, and public data
 
-On 19 volunteers (S02-S20) and the same subject splits for every method, the best EMG movement classifier is still a **random forest on frozen (not fine-tuned) MOMENT-1 features: 72.1%** leave-one-subject-out accuracy over 7 movements (chance 14.3%). An SVM on hand-crafted features of the same 5.12 s windows is close behind (71.7%), and MOMENT-1 fine-tuned with LoRA reaches 68.2%. On the two stroke patients (never trained on), frozen MOMENT features with MOMENT's own normalisation (RevIN) do best (68.7%), and LoRA reaches 57.5%.
+On 19 volunteers (S02-S20) and the same subject splits for every method, the best EMG movement classifier is still a **random forest on frozen (not fine-tuned) MOMENT-1 features: 72.1%** leave-one-subject-out accuracy over 7 movements (chance 14.3%). An SVM on hand-crafted features of the same 5.12 s windows is close behind (71.7%), and MOMENT-1 fine-tuned with LoRA reaches 68.2%, or 70.0% when its adapters are first pre-trained on NinaPro DB1 (2026-10-31, [below](#public-data-ninapro-db1)). On the two stroke patients (never trained on), frozen MOMENT features with MOMENT's own normalisation (RevIN) do best (68.7%), and LoRA reaches 57.5%.
 
 Results as of 2026-10-28, from `src/evaluation/compare_models.py`. The 5.12 s windows were rebuilt from all of `Dataset/` and MOMENT was fine-tuned again from the pinned base model; no earlier windows, adapters or runs were reused. Every fine-tuned model was reloaded from its saved files in `models/moment/` and reproduced its training score exactly.
 
@@ -49,6 +49,7 @@ Results as of 2026-10-28, from `src/evaluation/compare_models.py`. The 5.12 s wi
 | MOMENT before fine-tuning | Frozen + random forest (RevIN) | 58.3% | 0.563 | **68.7%** |
 | MOMENT after fine-tuning | Linear probe | 65.7% | 0.636 | - |
 | MOMENT after fine-tuning | LoRA | 68.2% | 0.670 | 57.5% |
+| MOMENT after fine-tuning | LoRA, pre-trained on NinaPro DB1 (2026-10-31) | 70.0% | 0.687 | 59.3% |
 
 Patient values are the mean of the 19 fold models, over both patients' windows.
 
@@ -138,7 +139,70 @@ Those runs (`models/moment/small_*_20261021-*`) are kept for reference; their pa
 
 > **Correction (2026-10-21).** Fine-tuning results published before 2026-10-21 were wrong. MOMENT enables gradient checkpointing by default; with its encoder frozen, this blocked every gradient to the LoRA adapters, so only the classification head ever trained. The fix (`enable_gradient_checkpointing: False` in `build_model`) is in place, and the smoke test fails if the adapters do not change.
 
+## Public data: NinaPro DB1
+
+Run on 2026-10-31 with the same 19 volunteers, windows and folds as above. [NinaPro DB1](datasets.md#public-data) was chosen because its electrodes already output a 100 Hz envelope like the MD0437, and its Exercise B has all 7 of our movements. UCI and EMG-EPN-612 are raw armband signals with only 3 shared movements. The EMG-EPN-612 data was deleted at the same time; no model in this section or above used it.
+
+**Step 1, classical models (`src.evaluation.public_data_gain`, 6,000 DB1 windows added to every training fold, label-balanced).** DB1 neither helped nor hurt, under any direction mapping:
+
+| Method | Own data only | + DB1, wrist names (3 shared labels) | + DB1, direct mapping (7) | + DB1, mirrored mapping (7) |
+|---|---|---|---|---|
+| SVM, 5.12 s window features | **71.7%** | 70.2% | 70.6% | 70.0% |
+| Random forest, 5.12 s window features | **70.8%** | 70.5% | 70.3% | 70.7% |
+| SVM, frozen MOMENT features | 69.8% | 69.9% | 69.9% | 69.9% |
+| Random forest, frozen MOMENT features | **72.1%** | 71.6% | 71.8% | 71.8% |
+
+**Step 2, fine-tuned MOMENT on the holdout (test S18-S20).** All runs start from the pinned base; `--max-extra 4200` for the added windows:
+
+| Run | Training data | LoRA | `SP02` | `SP03` |
+|---|---|---|---|---|
+| `small_holdout_newdata_20261027-230705` | Own data only | 82.2% | 48.5% | 64.8% |
+| `small_holdout_db1_pretrain_20261031-202258` | Pre-trained on DB1 (18,960 windows, 7 movements, wrist names), then own data | **85.7%** | 47.2% | 66.8% |
+| `small_holdout_db1_direct_20261031-203818` | Own data + 4,200 DB1 windows, direct mapping | 81.8% | 46.8% | 66.4% |
+| `small_holdout_db1_mirrored_20261031-204535` | Own data + 4,200 DB1 windows, mirrored mapping | 82.9% | 42.2% | 67.1% |
+
+DB1 pre-training reached 54.8% on 3 held-out DB1 people (7 movements).
+
+**Step 3, LOSO with DB1 pre-training (`small_loso_db1_pretrain_20261031-205339`, 19 folds, about 2 h on the M3 Pro):**
+
+| Volunteer | Own data only | Pre-trained on DB1 | Change |
+|---|---|---|---|
+| S02 | 27.2% | 32.2% | +5.0 |
+| S03 | 24.9% | 28.9% | +4.0 |
+| S04 | 46.8% | 46.5% | -0.3 |
+| S05 | 46.5% | 46.8% | +0.3 |
+| S06 | 62.1% | 67.8% | +5.6 |
+| S07 | 53.8% | 59.5% | +5.6 |
+| S08 | 47.5% | 48.8% | +1.3 |
+| S09 | 46.2% | 49.2% | +3.0 |
+| S10 | 84.1% | 82.1% | -2.0 |
+| S11 | 82.7% | 84.7% | +2.0 |
+| S12 | 87.4% | 88.0% | +0.7 |
+| S13 | 93.7% | 93.7% | 0.0 |
+| S14 | 86.4% | 83.4% | -3.0 |
+| S15 | 76.7% | 79.4% | +2.7 |
+| S16 | 76.1% | 87.7% | +11.6 |
+| S17 | 91.7% | 89.4% | -2.3 |
+| S18 | 90.7% | 87.0% | -3.7 |
+| S19 | 84.7% | 84.4% | -0.3 |
+| S20 | 87.0% | 90.7% | +3.7 |
+| **Mean** | 68.2% | **70.0%** | **+1.8** |
+| S02-S09 / S10-S20 | 44.4% / 85.6% | 47.5% / 86.4% | +3.1 / +0.8 |
+| Stroke patients `SP02` / `SP03` (mean of 19 models) | 51.6% / 63.5% | 50.6% / 68.0% | -1.0 / +4.5 |
+| Linear probe (Phase A) | 65.7% | 65.4% | -0.3 |
+
+![Effect of NinaPro DB1](figures/db1_data_gain.png)
+
+What the results show:
+
+- **DB1 is the first public dataset that helps.** Pre-training raised LOSO accuracy by 1.8 points (11 volunteers better, 4 equal within 0.5 points, 4 worse; Wilcoxon signed-rank p = 0.047, so only just significant with 19 people), and by 3.1 points on the harder volunteers S02-S09. Stroke patients rose from 57.5% to 59.3%. EMG-EPN-612 pre-training had *lowered* accuracy (44.6% vs 45.9%).
+- **The gain comes from pre-training, not from mixing.** Adding DB1 windows to training did nothing for the classical models or for LoRA, whether the wrist movements were mapped directly or mirrored. Pre-training teaches the encoder envelope patterns, and the head is then learnt on our data alone, so label mismatches do not matter.
+- **The direction mapping is not settled.** Direct and mirrored mappings scored within 1 point of each other, so DB1 does not tell us which wrist movement our Left and Right are.
+- **Still not the best model overall.** DB1-pre-trained LoRA (70.0%) is close to, but below, frozen MOMENT features + random forest (72.1%) and the 5.12 s SVM (71.7%). The differences are within the per-volunteer spread.
+
 ## Public data (UCI and EMG-EPN-612)
+
+> The EMG-EPN-612 data was deleted on 2026-10-31 (it can be downloaded again); the runs below are kept as a record. NinaPro DB1 replaced it ([above](#public-data-ninapro-db1)).
 
 Two public datasets were converted to MD0437-like windows (see [datasets.md](datasets.md#public-data)) and used in three ways, always testing on our own volunteers with the same 8 LOSO folds. This experiment was run on the 8-volunteer data (2026-10-21) and has not been repeated on 19 volunteers:
 
@@ -185,12 +249,12 @@ Why the public data did not help our volunteers:
 3. **Only 3 shared movements.** Directions (Left/Right/Up/Down) have no public equivalent, and adding Rest/Hand_Open/Hand_Close windows tilts training toward those classes.
 4. **Pre-training learns the public data well but transfers poorly.** EMG-EPN-612 pre-training reached 53.7% on its own held-out people, yet the adapted encoder made our volunteers slightly worse (44.6% vs 45.9%). It did help the stroke patient (55.4% vs 49.4%), whose signal is also unlike our healthy volunteers'.
 
-**Conclusion:** public armband data is not a substitute for recordings from our own sensor. The most reliable ways to raise accuracy are more volunteers recorded with the MD0437 setup, the missing S01 and S04 recordings, and, for direction movements, a second EMG channel.
+**Conclusion:** public armband data is not a substitute for recordings from our own sensor (NinaPro DB1, an envelope like ours, does help a little: [above](#public-data-ninapro-db1)). The most reliable ways to raise accuracy are more volunteers recorded with the MD0437 setup, the missing S01 and S04 recordings, and, for direction movements, a second EMG channel.
 
 ## What this means for the application
 
 - Keep the camera in charge of movement labels; EMG can help with hand open/close, activity feedback and, increasingly, direction as more volunteers are recorded.
-- For an EMG classifier on healthy users, use 5.12 s windows with per-subject calibration, and frozen MOMENT features + random forest (or an SVM on window features, or LoRA-fine-tuned MOMENT). For patients, test the RevIN variant as well.
+- For an EMG classifier on healthy users, use 5.12 s windows with per-subject calibration, and frozen MOMENT features + random forest (or an SVM on window features, or LoRA-fine-tuned MOMENT; if fine-tuning, pre-train on NinaPro DB1 first). For patients, test the RevIN variant as well.
 - Next improvements: more volunteers like S02-S09 (the harder group) and more stroke patients, the missing S01 and S04 recordings, a second EMG channel for directions, and a short per-patient calibration recording.
 
 ## Reproduce
@@ -204,6 +268,21 @@ Why the public data did not help our volunteers:
 .venv-finetune/bin/python -m src.evaluation.compare_models \
     --holdout-run models/moment/small_holdout_newdata_20261027-230705 \
     --loso-run models/moment/small_loso_newdata_20261027-231047         # about 1 hour
+```
+
+NinaPro DB1 runs (19 volunteers, 2026-10-31):
+
+```bash
+.venv/bin/python -m src.data.download_public ninapro_db1                  # 27 zips, about 560 MB
+for m in none direct mirrored; do .venv/bin/python -m src.data.public_emg ninapro_db1 --db1-mapping $m; done
+D=data/processed/public/ninapro_db1; L=models/moment/small_loso_newdata_20261027-231047
+for n in "" _direct _mirrored; do .venv-finetune/bin/python -m src.evaluation.public_data_gain --name db1$n --loso-run $L --public ${D}${n}_windows.npz; done
+.venv-finetune/bin/python -m src.models.finetune_moment --split holdout --pretrain-data ${D}_windows.npz --tag db1_pretrain
+.venv-finetune/bin/python -m src.models.finetune_moment --split holdout --extra-data ${D}_direct_windows.npz --max-extra 4200 --tag db1_direct
+.venv-finetune/bin/python -m src.models.finetune_moment --split holdout --extra-data ${D}_mirrored_windows.npz --max-extra 4200 --tag db1_mirrored
+.venv-finetune/bin/python -m src.models.finetune_moment --split loso --pretrain-data ${D}_windows.npz --tag db1_pretrain   # about 2 h
+.venv-finetune/bin/python -m src.evaluation.public_data_gain --name db1 --loso-run $L --public ${D}_windows.npz \
+    --finetuned $L models/moment/small_loso_db1_pretrain_20261031-205339
 ```
 
 Public-data runs (8 volunteers, 2026-10-21; to repeat them exactly, restore `results/splits_old_20261021.json` as `results/splits.json` and pass `--data data/processed/moment_old_20261018/windows.npz`):

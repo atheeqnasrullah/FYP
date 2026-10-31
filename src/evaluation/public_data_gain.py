@@ -91,8 +91,9 @@ def plot(table, dest, name="public"):
     for yv, acc in zip(y, summary.accuracy): ax.text(acc * 100 + 0.4, yv, f"{acc:.1%}", va="center", fontsize=9)
     ax.set_yticks(y, labels, fontsize=8); ax.set_xlim(0, max(60, summary.accuracy.max() * 100 + 8))
     ax.axvline(100 / 7, color="#c0392b", linestyle="--", linewidth=1)
-    ax.set_xlabel("Leave-one-subject-out accuracy on our 8 volunteers (%)")
-    title = {"public": "UCI", "uci_gestures": "UCI", "epn612": "EMG-EPN-612"}.get(name, name)
+    ax.set_xlabel("Leave-one-subject-out accuracy on our volunteers (%)")
+    title = {"public": "UCI", "uci_gestures": "UCI", "epn612": "EMG-EPN-612", "db1": "NinaPro DB1 (wrist names)",
+             "db1_direct": "NinaPro DB1 (direct mapping)", "db1_mirrored": "NinaPro DB1 (mirrored mapping)"}.get(name, name)
     ax.set_title(f"Effect of adding public {title} EMG data\n(grey: own data only, blue: with public data)", fontsize=11)
     fig.tight_layout(); dest.parent.mkdir(parents=True, exist_ok=True); fig.savefig(dest, dpi=150); plt.close(fig)
 

@@ -1,6 +1,6 @@
 """Convert public multi-channel EMG datasets into MD0437-like training windows.
 
-Public datasets (src.data.download_public) record raw EMG with an 8-channel
+UCI and EMG-EPN-612 (src.data.download_public) record raw EMG with an 8-channel
 Myo armband; our sensor gives one rectified, smoothed envelope at 100 Hz in
 ESP32 ADC units. Each armband channel is converted separately, as if it were
 one MD0437 placed at that spot (we do not know which channel matches our
@@ -24,9 +24,14 @@ Datasets:
   epn612        EMG-EPN-612: 612 people, 150-300 labelled recordings of 5 s at 200 Hz;
                 one random channel per recording by default (--channels), and
                 either the marked gesture part or the full 5 s (--epn-segment)
+  ninapro_db1   NinaPro DB1 Exercise B: 27 people, 10 Otto Bock electrodes that
+                already output an RMS envelope at 100 Hz, so steps 1-3 are skipped.
+                All 7 of our movements have a counterpart; --db1-mapping renames
+                the four wrist movements to Up/Down/Left/Right (direct or mirrored)
 
   python -m src.data.public_emg uci_gestures
   python -m src.data.public_emg epn612 [--channels 1] [--max-users N] [--epn-segment full|gesture]
+  python -m src.data.public_emg ninapro_db1 [--db1-mapping none|direct|mirrored]
 """
 import argparse, json, glob
 from pathlib import Path
@@ -116,7 +121,50 @@ def load_epn(channels=1, max_users=None, segment="full", seed=0):
     return records
 
 
-LOADERS = {"uci_gestures": load_uci, "epn612": load_epn}
+# DB1 Exercise B (S<n>_A1_E2.mat) movement numbers in restimulus; the other
+# 11 movements (single fingers, rotations, pointing) have no counterpart in ours.
+DB1_LABELS = {0: "Rest", 5: "Hand_Open", 6: "Hand_Close", 13: "Wrist_Flexion", 14: "Wrist_Extension",
+              15: "Radial_Deviation", 16: "Ulnar_Deviation"}
+# Our directions as wrist movements of a right hand, palm down (direct), or with Left/Right swapped.
+DB1_MAPPINGS = {"none": {},
+                "direct": {"Wrist_Extension": "Up", "Wrist_Flexion": "Down", "Radial_Deviation": "Left", "Ulnar_Deviation": "Right"},
+                "mirrored": {"Wrist_Extension": "Up", "Wrist_Flexion": "Down", "Radial_Deviation": "Right", "Ulnar_Deviation": "Left"}}
+
+
+def db1_runs(label):
+    """(start, end, label) of every stretch of constant restimulus."""
+    starts = np.flatnonzero(np.diff(label, prepend=label[0] - 1))
+    return [(a, b, int(label[a])) for a, b in zip(starts, list(starts[1:]) + [len(label)])]
+
+
+def load_db1(mapping="none"):
+    """NinaPro DB1 Exercise B, one record per repetition and electrode, envelope used as recorded.
+
+    Rest is kept only after a movement we use, thinned to as many pauses as
+    repetitions of one movement, so it does not outnumber the other labels."""
+    from scipy.io import loadmat
+    paths = sorted(glob.glob(str(PUBLIC_DIR / "ninapro_db1/raw/**/S*_A1_E2.mat"), recursive=True))
+    if not paths: raise SystemExit("Run python -m src.data.download_public ninapro_db1 first")
+    rename = DB1_MAPPINGS[mapping]; records = []
+    for path in paths:
+        d = {k.lower(): v for k, v in loadmat(path).items() if not k.startswith("__")}
+        subject = f"DB1_{Path(path).name.split('_')[0]}"
+        emg = np.asarray(d["emg"], float); label = np.asarray(d["restimulus"]).ravel().astype(int)
+        runs = db1_runs(label)
+        moves = [r for r in runs if r[2] in DB1_LABELS and r[2] != 0]
+        rests = [cur for prev, cur in zip(runs, runs[1:]) if cur[2] == 0 and prev[2] in DB1_LABELS]
+        reps = max(1, len(moves) // (len(DB1_LABELS) - 1))
+        if len(rests) > reps: rests = [rests[i] for i in np.linspace(0, len(rests) - 1, reps).round().astype(int)]
+        for a, b, cls in sorted(moves + rests):
+            name = rename.get(DB1_LABELS[cls], DB1_LABELS[cls])
+            for ch in range(emg.shape[1]):
+                records.append({"subject": subject, "channel": ch + 1, "cohort": "public_db1", "label": name,
+                                "segment": f"{subject}_{a}_ch{ch + 1}", "t": np.arange(b - a) * float(STEP_MS),
+                                "adc": emg[a:b, ch].copy(), "interp": np.zeros(b - a, bool)})
+    return records
+
+
+LOADERS = {"uci_gestures": load_uci, "epn612": load_epn, "ninapro_db1": load_db1}
 
 
 def build(name, **loader_args):
@@ -136,7 +184,8 @@ def build(name, **loader_args):
         wins, _ = windows_from(r, stats[r["calib"]], 128, MIN_SAMPLES, 0.25)
         for w in wins:
             X.append(w.pop("X")); mask.append(w.pop("mask"))
-            rows.append({"subject": r["subject"], "channel": r["channel"], "cohort": r["cohort"], "label": r["label"], "segment": r["segment"], **w})
+            rows.append({"subject": r["subject"], "channel": r["channel"], "cohort": r["cohort"], "label": r["label"], "segment": r["segment"],
+                         "mean_adc": float(r["adc"].mean()), **w})
     manifest = pd.DataFrame(rows)
     labels = sorted(manifest.label.unique(), key=lambda l: (l not in SHARED, SHARED.index(l) if l in SHARED else 0, l))
     return np.stack(X)[:, None, :], np.stack(mask), manifest, labels, target
@@ -148,19 +197,24 @@ def main(argv=None):
     parser.add_argument("--channels", type=int, default=1, help="epn612: armband channels kept per recording")
     parser.add_argument("--max-users", type=int, help="epn612: only the first N user files")
     parser.add_argument("--epn-segment", choices=["full", "gesture"], default="full", help="epn612: whole 5 s recording, or only the marked gesture")
+    parser.add_argument("--db1-mapping", choices=list(DB1_MAPPINGS), default="none", help="ninapro_db1: keep wrist names, or rename them to our directions")
     args = parser.parse_args(argv)
-    extra = {"channels": args.channels, "max_users": args.max_users, "segment": args.epn_segment} if args.name == "epn612" else {}
+    extra = {"epn612": {"channels": args.channels, "max_users": args.max_users, "segment": args.epn_segment},
+             "ninapro_db1": {"mapping": args.db1_mapping}}.get(args.name, {})
     X, mask, manifest, labels, target = build(args.name, **extra)
     y = manifest.label.map(labels.index).to_numpy(np.int64)
-    OUT_DIR.mkdir(parents=True, exist_ok=True); out = OUT_DIR / f"{args.name}_windows.npz"
+    suffix = f"_{args.db1_mapping}" if args.name == "ninapro_db1" and args.db1_mapping != "none" else ""
+    OUT_DIR.mkdir(parents=True, exist_ok=True); out = OUT_DIR / f"{args.name}{suffix}_windows.npz"
     np.savez_compressed(out, X=X, mask=mask, y=y, labels=np.array(labels), subject=manifest.subject.to_numpy(str),
                         channel=manifest.channel.to_numpy(np.int64), cohort=manifest.cohort.to_numpy(str), label=manifest.label.to_numpy(str))
     meta = {"source": args.name, "windows": len(manifest), "labels": labels, "shared_with_dataset": SHARED,
-            "subjects": int(manifest.subject.nunique()), "channels_per_recording": extra.get("channels", 8),
+            "subjects": int(manifest.subject.nunique()), "channels_per_recording": extra.get("channels", 10 if args.name == "ninapro_db1" else 8),
             "options": extra, "smooth_ms": SMOOTH_MS,
             "target_p95_adc": round(target, 1), "mean_valid_samples": round(float(mask.sum(1).mean()), 1), "seq_len": SEQ_LEN,
-            "windows_by_label": manifest.label.value_counts().to_dict()}
-    out.with_name(f"{args.name}_metadata.json").write_text(json.dumps(meta, indent=2))
+            "windows_by_label": manifest.label.value_counts().to_dict(),
+            # Compare with our volunteers (docs/datasets.md): Hand_Close highest, Rest lowest.
+            "median_adc_by_label": manifest.groupby("label").mean_adc.median().round(1).sort_values(ascending=False).to_dict()}
+    out.with_name(f"{args.name}{suffix}_metadata.json").write_text(json.dumps(meta, indent=2))
     print(json.dumps(meta, indent=2))
 
 if __name__ == "__main__": main()

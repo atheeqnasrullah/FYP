@@ -1,0 +1,340 @@
+{
+  "created": "2026-10-27T17:34:55+00:00",
+  "source": "Dataset/",
+  "fs_hz": 100,
+  "seq_len": 512,
+  "window_s": 5.12,
+  "step": 128,
+  "min_samples": 256,
+  "max_interp": 0.25,
+  "transform": "log1p(adc), per-subject z-score, clip",
+  "clip": 6.0,
+  "labels": [
+    "Rest",
+    "Hand_Open",
+    "Hand_Close",
+    "Left",
+    "Right",
+    "Up",
+    "Down"
+  ],
+  "segments": 150,
+  "windows": 6407,
+  "padded_windows": 0,
+  "windows_by_cohort": {
+    "healthy": 5805,
+    "stroke_patient": 602
+  },
+  "windows_by_subject_label": {
+    "S02": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S03": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S04": {
+      "Down": 0,
+      "Hand_Close": 86,
+      "Hand_Open": 86,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 86
+    },
+    "S05": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S06": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S07": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S08": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S09": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S10": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S11": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S12": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S13": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S14": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S15": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S16": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S17": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S18": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S19": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "S20": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "SP02": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    },
+    "SP03": {
+      "Down": 43,
+      "Hand_Close": 43,
+      "Hand_Open": 43,
+      "Left": 43,
+      "Rest": 43,
+      "Right": 43,
+      "Up": 43
+    }
+  },
+  "excluded_subjects": {
+    "S01": "39% of samples interpolated (limit 25%)"
+  },
+  "dropped_windows_by_subject": {},
+  "calibration": {
+    "S02": {
+      "mean": 0.7068426401754709,
+      "std": 2.0805296526433614,
+      "samples": 42233
+    },
+    "S03": {
+      "mean": 0.19818440452667865,
+      "std": 1.100912760972714,
+      "samples": 42000
+    },
+    "S04": {
+      "mean": 2.5769427035232066,
+      "std": 2.9191987616854362,
+      "samples": 54004
+    },
+    "S05": {
+      "mean": 2.8709075161913007,
+      "std": 2.944619290377158,
+      "samples": 42002
+    },
+    "S06": {
+      "mean": 2.5347984269195107,
+      "std": 2.8820398500977196,
+      "samples": 42000
+    },
+    "S07": {
+      "mean": 2.8525459406011144,
+      "std": 2.892782541956553,
+      "samples": 42004
+    },
+    "S08": {
+      "mean": 3.413825039284,
+      "std": 2.829740205169716,
+      "samples": 42000
+    },
+    "S09": {
+      "mean": 3.161659098008883,
+      "std": 2.801852869413878,
+      "samples": 42000
+    },
+    "S10": {
+      "mean": 2.5023852857474282,
+      "std": 2.882845486618095,
+      "samples": 42000
+    },
+    "S11": {
+      "mean": 2.659259571650103,
+      "std": 2.984809038202963,
+      "samples": 42000
+    },
+    "S12": {
+      "mean": 2.525363336804108,
+      "std": 2.9277272988352623,
+      "samples": 42000
+    },
+    "S13": {
+      "mean": 2.5951472515593488,
+      "std": 2.907328296170959,
+      "samples": 42000
+    },
+    "S14": {
+      "mean": 2.567955579620447,
+      "std": 2.9065416114653178,
+      "samples": 42000
+    },
+    "S15": {
+      "mean": 2.436683698037139,
+      "std": 2.74707493211093,
+      "samples": 42000
+    },
+    "S16": {
+      "mean": 2.617705045682331,
+      "std": 2.966462161339803,
+      "samples": 42000
+    },
+    "S17": {
+      "mean": 2.435485929788474,
+      "std": 2.817521212808651,
+      "samples": 42000
+    },
+    "S18": {
+      "mean": 2.5118966203563455,
+      "std": 2.901235579301498,
+      "samples": 42000
+    },
+    "S19": {
+      "mean": 2.486565701244129,
+      "std": 2.7904220232187447,
+      "samples": 42000
+    },
+    "S20": {
+      "mean": 2.5277766946838893,
+      "std": 2.805897789137309,
+      "samples": 42000
+    },
+    "SP02": {
+      "mean": 1.412246359228947,
+      "std": 1.8259536501495142,
+      "samples": 42000
+    },
+    "SP03": {
+      "mean": 1.3932666729829357,
+      "std": 1.7604716176481139,
+      "samples": 42000
+    }
+  },
+  "class_weights_healthy": {
+    "Rest": 1.015,
+    "Hand_Open": 0.9643,
+    "Hand_Close": 0.9643,
+    "Left": 1.015,
+    "Right": 1.015,
+    "Up": 0.9643,
+    "Down": 1.0714
+  },
+  "note": "stroke_patient is an extra test set only; train on cohort == healthy only"
+}

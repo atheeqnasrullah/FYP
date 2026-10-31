@@ -6,3 +6,7 @@ small_loso_epn_pretrain_20261021-193241,2026-10-21T19:32:41+05:30,small,loso,Fal
 small_loso_uci_pretrain_20261021-201317,2026-10-21T20:13:17+05:30,small,loso,False,8,uci_gestures_windows.npz,,0.4304,0.4504,0.5395
 small_holdout_newdata_20261027-230705,2026-10-27T23:07:05+05:30,small,holdout,False,1,,,0.7486,0.8217,0.5664
 small_loso_newdata_20261027-231047,2026-10-27T23:10:47+05:30,small,loso,False,19,,,0.6566,0.6822,0.5752
+small_holdout_db1_pretrain_20261031-202258,2026-10-31T20:22:58+05:30,small,holdout,False,1,ninapro_db1_windows.npz,,0.7708,0.8571,0.5698
+small_holdout_db1_direct_20261031-203818,2026-10-31T20:38:18+05:30,small,holdout,False,1,,ninapro_db1_direct_windows.npz,0.7519,0.8184,0.5664
+small_holdout_db1_mirrored_20261031-204535,2026-10-31T20:45:35+05:30,small,holdout,False,1,,ninapro_db1_mirrored_windows.npz,0.7697,0.8295,0.5465
+small_loso_db1_pretrain_20261031-205339,2026-10-31T20:53:39+05:30,small,loso,False,19,ninapro_db1_windows.npz,,0.6543,0.7001,0.5929

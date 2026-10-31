@@ -1,0 +1,66 @@
+{
+  "run_id": "small_holdout_db1_mirrored_20261031-204535",
+  "status": "completed",
+  "created": "2026-10-31T20:45:35+05:30",
+  "size": "small",
+  "base_model": "AutonLab/MOMENT-1-small",
+  "base_revision": "411e288267f82cce86296dbe4d6c8bc533cc162f",
+  "revin": false,
+  "labels": [
+    "Rest",
+    "Hand_Open",
+    "Hand_Close",
+    "Left",
+    "Right",
+    "Up",
+    "Down"
+  ],
+  "split": "holdout",
+  "folds": [
+    "S18+S19+S20"
+  ],
+  "seq_len": 512,
+  "args": {
+    "size": "small",
+    "split": "holdout",
+    "data": "/Users/admin/Projects/Atheek FYP/FYP/data/processed/moment/windows.npz",
+    "revin": false,
+    "class_weights": false,
+    "probe_epochs": 15,
+    "lora_epochs": 15,
+    "lora_rank": 8,
+    "batch_size": 32,
+    "patience": 4,
+    "extra_data": "data/processed/public/ninapro_db1_mirrored_windows.npz",
+    "pretrain_data": null,
+    "pretrain_epochs": 10,
+    "max_extra": 4200,
+    "max_pretrain": null,
+    "tag": "db1_mirrored"
+  },
+  "environment": {
+    "python": "3.11.17",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "device": "mps",
+    "torch": "2.14.1",
+    "momentfm": "0.1.4",
+    "peft": "0.13.2",
+    "transformers": "4.33.3",
+    "numpy": "1.25.2",
+    "git_commit": "77a2626caaec05bb357b449fbb27546fd0b43172",
+    "git_dirty": true
+  },
+  "results": {
+    "linear_probe": {
+      "accuracy": 0.7697,
+      "macro_f1": 0.7649
+    },
+    "lora": {
+      "accuracy": 0.8295,
+      "macro_f1": 0.8262
+    },
+    "lora_stroke_patient": {
+      "accuracy": 0.5465
+    }
+  }
+}
